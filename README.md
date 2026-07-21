@@ -118,42 +118,69 @@ disaster-recovery
   └── s3-frontend (versioning)
 ```
 
-## Prerequisites
+## Setup
 
+### Prerequisites
+- macOS (Intel or Apple Silicon), Linux, or Windows (WSL2)
 - AWS Account with appropriate permissions
-- Terraform >= 1.0
-- Terragrunt >= 0.40.0
+- Docker (for LocalStack and building microservice images)
 - AWS CLI v2 configured with credentials
-- Docker (for building microservice images)
 
-## Local Development Setup
+### Install OpenTofu
 
-### LocalStack Setup (Version 4.4.0)
-
-To run AWS services locally for development and testing, use LocalStack Docker image:
-
+**macOS** (Homebrew):
 ```bash
-docker run -d --name localstack -p 4566:4566 -e DOCKER_HOST=unix:///var/run/docker.sock localstack/localstack:4.4.0
+brew install opentofu
+tofu version  # Verify installation
 ```
 
-This command:
-- Runs LocalStack in detached mode (`-d`)
-- Names the container `localstack`
-- Exposes port 4566 for LocalStack services
-- Mounts Docker socket for Docker-in-Docker support
-- Uses LocalStack version 4.4.0
+**Linux**:
+```bash
+# Ubuntu/Debian
+wget -O - https://get.opentofu.org/opentofu.gpg | sudo gpg --dearmor -o /usr/share/keyrings/opentofu-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/opentofu-archive-keyring.gpg] https://packages.opentofu.org/opentofu/tofu/any/ any main" | sudo tee /etc/apt/sources.list.d/opentofu.list
+sudo apt-get update && sudo apt-get install -y tofu
+```
 
-To verify LocalStack is running:
+**Windows (Chocolatey)**:
+```powershell
+choco install opentofu
+```
+
+### Install Terragrunt
+
+**macOS**:
+```bash
+brew install terragrunt
+terragrunt --version  # Verify installation
+```
+
+**Linux**:
+```bash
+wget https://github.com/gruntwork-io/terragrunt/releases/download/v0.54.5/terragrunt_linux_amd64
+chmod +x terragrunt_linux_amd64
+sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
+```
+
+**Windows (Chocolatey)**:
+```powershell
+choco install terragrunt
+```
+
+### Start LocalStack (v4.4.0)
 
 ```bash
+docker run -d --name localstack \
+  -p 4566:4566 \
+  -e SERVICES=ec2,rds,s3,elasticloadbalancing,ecs,cloudwatch \
+  -e DOCKER_HOST=unix:///var/run/docker.sock \
+  localstack/localstack:4.4.0
+
+# Verify health
 curl http://localhost:4566/_localstack/health
 ```
 
-To stop LocalStack:
-
-```bash
-docker stop localstack && docker rm localstack
-```
+To stop: `docker stop localstack && docker rm localstack`
 
 ## Quick Start
 
