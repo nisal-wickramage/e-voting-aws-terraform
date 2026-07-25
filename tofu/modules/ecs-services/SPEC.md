@@ -76,6 +76,63 @@ services = {
 - **aws_appautoscaling_target**: Auto-scaling target for tasks
 - **aws_appautoscaling_policy**: CPU/memory-based scaling policies
 
+## Implementation Steps
+
+1. **Create CloudWatch Log Groups** (`logging.tf`)
+   - Resource: `aws_cloudwatch_log_group` (per service)
+   - Input: `project_name` + service name
+   - Logic: `for_each` over services map
+   - Retention: configurable per environment
+
+2. **Create ECR Repositories** (`ecr.tf`)
+   - Resource: `aws_ecr_repository` (per service)
+   - Input: Service names from services map
+   - Output: `ecr_repository_urls`, `ecr_repository_names`
+   - Configuration: Immutable tags, scan on push
+
+3. **Create Task Execution Role** (`iam.tf`)
+   - Resource: `aws_iam_role`, `aws_iam_role_policy_attachment`
+   - Permissions: ECR pull, CloudWatch logs, Secrets Manager (if used)
+   - Logic: Single shared role or per-service
+
+4. **Create Task Role** (`iam.tf`)
+   - Resource: `aws_iam_role`, `aws_iam_role_policy_attachment`
+   - Permissions: Application-specific (database access, API calls)
+   - Logic: Per-service with least-privilege policies
+
+5. **Create Task Definitions** (`task_definitions.tf`)
+   - Resource: `aws_ecs_task_definition` (per service)
+   - Inputs: `task_cpu`, `task_memory`, `container_port`, `docker_image_tag`
+   - Configuration: Environment variables, secrets, logging
+   - Dependencies: Execution role (step 3), Task role (step 4), CloudWatch log group (step 1)
+   - Output: `ecs_task_definition_arns`
+
+6. **Create ALB Target Groups** (`alb_targets.tf`)
+   - Resource: `aws_lb_target_group` (per service)
+   - Configuration: HTTP health checks, deregistration delay
+   - Input: `vpc_id`, `health_check_path`, `container_port`
+   - Dependencies: VPC from network module
+   - Output: `target_group_arns`
+
+7. **Create ALB Listener Rules** (`alb_routing.tf`)
+   - Resource: `aws_lb_listener_rule` (per service)
+   - Logic: Path-based or hostname-based routing
+   - Routing: ALB listener → service target group
+   - Dependencies: Target groups (step 6), ALB from platform module
+
+8. **Create ECS Services** (`services.tf`)
+   - Resource: `aws_ecs_service` (per service)
+   - Configuration: desired_count, launch_type = FARGATE, network_configuration
+   - Dependencies: Task definition (step 5), ECS cluster, Target group (step 6)
+   - Output: `ecs_service_arns`
+
+9. **Create Auto-scaling Configuration** (`autoscaling.tf`)
+   - Resources: `aws_appautoscaling_target`, `aws_appautoscaling_policy`
+   - Policies: CPU-based (70%), memory-based (80%)
+   - Inputs: `min_capacity`, `max_capacity`
+   - Logic: `for_each` per service
+   - Dependencies: ECS services from step 8
+
 ## Security
 
 ### IAM Roles

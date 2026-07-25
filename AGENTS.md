@@ -131,22 +131,89 @@ locals {
 ## Module Development Workflow
 
 ### 1. Define Module Spec
-Create `SPEC.md` in module directory:
+Create `SPEC.md` in module directory with the following structure:
 - **Purpose**: 1-2 line summary
+- **Implementation Steps**: Numbered, granular steps for building the module (see examples below)
 - **Inputs**: Variable names, types, descriptions
 - **Outputs**: Output names, descriptions
 - **Resources**: List of AWS resources created
 - **Security**: Security group rules, IAM policies
 - **Testing**: Expected behavior, edge cases
 
-### 2. Implement Module
-- Start with `variables.tf` (inputs)
-- Implement core resources in `main.tf` or domain-specific files
-- Define `outputs.tf` (must match spec)
-- Add comprehensive comments for non-obvious logic
-- Use consistent naming: `aws_<resource>_<descriptor>` (e.g., `aws_security_group_alb_ingress`)
+### 2. Implementation Steps Pattern
+Each module SPEC.md should include detailed implementation steps. Example for **Network Module**:
 
-### 3. Test with LocalStack
+```
+## Implementation Steps
+
+1. **Create VPC**
+   - Resource: aws_vpc
+   - Inputs: vpc_cidr, enable_dns_hostnames, enable_dns_support
+   - Output: vpc_id
+   - File: main.tf
+
+2. **Create VPC Endpoints Security Group**
+   - Resource: aws_security_group
+   - Rules: Inbound HTTPS (443) from VPC CIDR
+   - Output: vpc_endpoint_sg_id
+   - File: main.tf
+
+3. **Create Tier-based Subnets**
+   - Resources: aws_subnet (6 total: 2 web, 2 app, 2 db)
+   - Logic: for_each over subnets_by_tier local
+   - Inputs: availability_zones, private_subnet_cidrs
+   - Output: private_subnet_ids_by_tier
+   - File: subnets.tf
+
+4. **Create Tier-specific Route Tables**
+   - Resources: aws_route_table (3 total: web, app, db)
+   - Logic: One per tier with VPC CIDR local route
+   - Output: private_route_table_ids_by_tier
+   - File: route_tables.tf
+
+5. **Associate Subnets to Route Tables**
+   - Resources: aws_route_table_association (6 total)
+   - Logic: for_each web/app/db subnets
+   - Dependencies: Subnets (step 3), Route tables (step 4)
+   - File: route_tables.tf
+
+6. **Create Tier-specific Network ACLs**
+   - Resources: aws_network_acl (3 total)
+   - Logic: Inline subnet_ids association
+   - Output: nacl_ids_by_tier
+   - File: nacls.tf
+
+7. **Define NACL Rules**
+   - Resources: aws_network_acl_rule (multiple)
+   - Logic: for_each over tier CIDR blocks for dynamic rules
+   - Rules per tier:
+     - Web: inbound from app (1024-65535), outbound to app (8080-65535), HTTPS, DNS
+     - App: inbound from web (1024-65535), outbound to db (5432), HTTPS, DNS
+     - Db: inbound from app (5432), outbound HTTPS, DNS
+   - File: nacls.tf
+
+8. **Create VPC Endpoints**
+   - Resources: aws_vpc_endpoint (gateway + interface)
+   - Logic: Separate gateway (s3, dynamodb) from interface endpoints via locals
+   - Placement: App tier subnets only
+   - Output: vpc_endpoint_ids
+   - File: vpc_endpoints.tf
+
+9. **Optional: VPC Flow Logs**
+   - Resources: aws_flow_log, aws_cloudwatch_log_group, aws_iam_role, aws_iam_role_policy
+   - Condition: if var.enable_flow_logs == true
+   - File: main.tf
+```
+
+### 3. Implement Module
+- Start with `variables.tf` (define all inputs with validation)
+- Follow implementation steps in order (each step is typically one file or logical grouping)
+- Implement resources in domain-specific files (main.tf, subnets.tf, nacls.tf, etc.)
+- Define `outputs.tf` (must match spec outputs)
+- Add comments for each step's purpose
+- Use consistent naming: `aws_<resource>_<descriptor>` (e.g., `aws_security_group_vpc_endpoints`)
+
+### 4. Test with LocalStack
 
 **Prerequisites**: Docker running, LocalStack v4.4.0 installed
 

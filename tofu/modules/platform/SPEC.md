@@ -52,6 +52,57 @@ Create ECS cluster and Application Load Balancer foundation in private subnets, 
 - **aws_security_group_rule**: ALB ← CloudFront, ECS ← ALB
 - **aws_cloudwatch_log_group**: ECS cluster logs (if Container Insights enabled)
 
+## Implementation Steps
+
+1. **Create ECS Cluster** (`cluster.tf`)
+   - Resource: `aws_ecs_cluster`
+   - Input: `cluster_name`, `enable_container_insights`
+   - Outputs: `ecs_cluster_id`, `ecs_cluster_arn`, `ecs_cluster_name`
+
+2. **Create ECS Cluster Capacity Providers** (`cluster.tf`)
+   - Resources: `aws_ecs_cluster_capacity_providers`, `aws_ecs_cluster_capacity_providers_defaults`
+   - Providers: FARGATE, FARGATE_SPOT
+   - Dependencies: ECS cluster from step 1
+
+3. **Create CloudWatch Log Group** (`logging.tf`) - Conditional on `enable_container_insights`
+   - Resource: `aws_cloudwatch_log_group`
+   - Input: `cluster_name`
+   - Used for Container Insights metrics
+
+4. **Create ALB Security Group** (`security.tf`)
+   - Resource: `aws_security_group`
+   - Rules: Inbound HTTPS (443) from CloudFront/VPC, Outbound to ECS SG
+   - Input: `vpc_id`
+   - Output: `alb_security_group_id`
+   - Dependencies: VPC from network module
+
+5. **Create ECS Security Group** (`security.tf`)
+   - Resource: `aws_security_group`
+   - Rules: Inbound dynamic ports (1024-65535) from ALB, Outbound all traffic
+   - Input: `vpc_id`
+   - Output: `ecs_security_group_id`
+   - Dependencies: ALB security group from step 4
+
+6. **Create Application Load Balancer** (`alb.tf`)
+   - Resource: `aws_lb`
+   - Inputs: `alb_name`, `alb_internal = true`, `enable_cross_zone_load_balancing`
+   - Placement: Private subnets only
+   - Security Group: From step 4
+   - Outputs: `alb_id`, `alb_arn`, `alb_dns_name`, `alb_zone_id`
+   - Dependencies: VPC from network module, Private subnets from network module, ALB security group (step 4)
+
+7. **Create Default Target Group** (`alb.tf`)
+   - Resource: `aws_lb_target_group`
+   - Configuration: HTTP, health check (path /, interval 30s, timeout 5s)
+   - Input: `vpc_id`, `deregistration_delay`
+   - Output: `default_target_group_arn`, `default_target_group_name`
+   - Dependencies: VPC from network module
+
+8. **Create ALB Listener** (`alb.tf`)
+   - Resource: `aws_lb_listener`
+   - Configuration: HTTP (80) → Default target group (step 7)
+   - Dependencies: ALB (step 6), Target group (step 7)
+
 ## Security
 
 ### Security Groups

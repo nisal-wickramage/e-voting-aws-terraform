@@ -56,6 +56,63 @@ Create CloudWatch alarms, dashboards, and log groups for operational visibility 
 - **aws_cloudwatch_dashboard**: Custom dashboard with widgets
 - **aws_cloudwatch_event_rule**: Event-based triggers (optional)
 
+## Implementation Steps
+
+1. **Create SNS Topic for Alarms** (`notifications.tf`)
+   - Resource: `aws_sns_topic`
+   - Output: `sns_topic_arn`, `sns_topic_name`
+   - Purpose: Central notification hub for all alarms
+
+2. **Subscribe Email to SNS Topic** (`notifications.tf`) - Conditional on `alarm_email`
+   - Resource: `aws_sns_topic_subscription`
+   - Input: `alarm_email`
+   - Confirmation: Manual email confirmation required
+
+3. **Create CloudWatch Log Groups** (`logs.tf`)
+   - Resources: `aws_cloudwatch_log_group` (per service/component)
+   - Input: `log_retention_days`
+   - Logs for: ECS tasks, RDS, ALB, Application
+
+4. **Create ECS Alarms** (`alarms_ecs.tf`)
+   - Resources: `aws_cloudwatch_metric_alarm` (3 types)
+   - Alarms:
+     - CPU utilization: Threshold `ecs_cpu_threshold`
+     - Memory utilization: Threshold `ecs_memory_threshold`
+     - Running task count: Alert if below `ecs_task_count_threshold`
+   - Inputs: `ecs_cluster_name`, `alarm_email`, Threshold values
+   - Dependency: SNS topic (step 1)
+
+5. **Create RDS Alarms** (`alarms_rds.tf`)
+   - Resources: `aws_cloudwatch_metric_alarm` (3 types)
+   - Alarms:
+     - CPU utilization: Threshold `rds_cpu_threshold`
+     - Storage utilization: Threshold `rds_storage_threshold`
+     - Database connections: Alert on high connections
+   - Inputs: `db_instance_id`, Threshold values
+   - Dependency: SNS topic (step 1)
+
+6. **Create ALB Alarms** (`alarms_alb.tf`)
+   - Resources: `aws_cloudwatch_metric_alarm` (4 types)
+   - Alarms:
+     - Unhealthy targets: Alert if > `alb_target_unhealthy_threshold`
+     - Response time: Alert if > `alb_response_time_threshold` ms
+     - HTTP 5xx errors: Alert if > `alb_http_5xx_threshold` per minute
+     - Target response time: P99 latency
+   - Inputs: `alb_arn_suffix`, `alb_target_group_arn_suffix`, Threshold values
+   - Dependency: SNS topic (step 1)
+
+7. **Create Log Metric Filters** (`metric_filters.tf`) - Optional for custom metrics
+   - Resources: `aws_cloudwatch_log_metric_filter`
+   - Filters: Application-specific patterns (e.g., error counts, voting submissions)
+   - Purpose: Convert log events into custom metrics
+
+8. **Create CloudWatch Dashboard** (`dashboard.tf`) - Conditional on `enable_dashboard`
+   - Resource: `aws_cloudwatch_dashboard`
+   - Input: `dashboard_name`
+   - Widgets: ECS metrics, RDS metrics, ALB metrics, custom application metrics
+   - Layout: Grid layout with key performance indicators
+   - Output: `dashboard_arn`, `dashboard_name`
+
 ## Security
 
 ### Access Control

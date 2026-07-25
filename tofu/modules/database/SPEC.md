@@ -55,6 +55,39 @@ Create a production-grade RDS PostgreSQL Multi-AZ cluster with automated backups
 - **aws_iam_role_policy_attachment**: Attach monitoring policy
 - **aws_rds_cluster_parameter_group**: Cluster-level parameters
 
+## Implementation Steps
+
+1. **Create DB Subnet Group** (`main.tf`)
+   - Resource: `aws_db_subnet_group`
+   - Input: `private_subnet_ids` from network module
+   - Validation: Must span 2+ availability zones
+   - Output: `db_subnet_group_id`, `db_subnet_group_arn`
+
+2. **Create Security Group for RDS** (`security.tf`)
+   - Resource: `aws_security_group`
+   - Rules: Inbound TCP 5432 from ECS security group only
+   - Input: `vpc_id`, `ecs_security_group_id`
+   - Output: `db_security_group_id`
+
+3. **Create DB Parameter Group** (`parameters.tf`) - Optional: customizable
+   - Resource: `aws_db_parameter_group`
+   - Configuration: PostgreSQL version-specific, SSL enforcement
+   - Output: `db_parameter_group_id`
+
+4. **Create IAM Role for Enhanced Monitoring** (`monitoring.tf`) - Conditional on `enable_enhanced_monitoring`
+   - Resources: `aws_iam_role`, `aws_iam_role_policy_attachment`
+   - Policy: `AmazonRDSEnhancedMonitoringRolePolicy`
+   - Output: `db_monitoring_role_arn`
+
+5. **Create RDS Instance** (`main.tf`)
+   - Resource: `aws_db_instance` or `aws_rds_cluster_instance`
+   - Inputs: `db_name`, `db_master_username`, `db_master_password`, `db_instance_class`, `db_allocated_storage`
+   - Multi-AZ: `enable_multi_az = true`
+   - Backup: `backup_retention_days`, `backup_window`
+   - Monitoring: Link to role from step 4
+   - Outputs: `db_instance_endpoint`, `db_instance_address`, `db_instance_port`
+   - Dependencies: Subnet group (step 1), Security group (step 2), Parameter group (step 3), Monitoring role (step 4)
+
 ## Security
 
 ### Security Group Rules

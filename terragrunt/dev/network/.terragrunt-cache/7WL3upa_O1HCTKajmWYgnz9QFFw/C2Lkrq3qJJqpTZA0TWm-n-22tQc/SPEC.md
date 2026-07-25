@@ -8,16 +8,13 @@ Create a private-only VPC with multi-AZ tier-based subnets (web, app, db), VPC e
 | Variable | Type | Description | Required | Example |
 |----------|------|-------------|----------|---------|
 | `vpc_cidr` | string | CIDR block for VPC | Yes | `"10.0.0.0/16"` |
-| `availability_zones` | list(string) | Availability zones for subnet deployment (exactly 2) | No | `["us-east-1a", "us-east-1b"]` |
 | `private_subnet_cidrs` | map(list(string)) | CIDR blocks by tier (web, app, db), 2 AZs each | Yes | `{web: ["10.0.1.0/24", "10.0.2.0/24"], app: ["10.0.11.0/24", "10.0.12.0/24"], db: ["10.0.21.0/24", "10.0.22.0/24"]}` |
 | `vpc_endpoint_services` | list(string) | VPC endpoint services to create (s3, dynamodb as gateway; others as interface). Empty list = no endpoints. | No | `["s3", "dynamodb", "ec2", "cloudwatch", "secretsmanager", "logs"]` |
 | `s3_prefix_list_id` | string | AWS S3 prefix list ID for region (optional) | No | `"pl-12345678"` |
 | `dynamodb_prefix_list_id` | string | AWS DynamoDB prefix list ID for region (optional) | No | `"pl-87654321"` |
 | `environment` | string | Environment name (dev/staging/prod) | Yes | `"dev"` |
 | `project_name` | string | Project name for resource tagging | Yes | `"e-voting"` |
-| `common_tags` | map(string) | Common tags for all resources | No | `{Environment: "dev", Project: "e-voting", ManagedBy: "terraform"}` |
-| `enable_flow_logs` | bool | Enable VPC Flow Logs for debugging | No | `false` |
-| `flow_logs_retention_days` | number | VPC Flow Logs retention in days | No | `7` |
+| `common_tags` | map(string) | Common tags for all resources | Yes | `{Environment: "dev", Project: "e-voting", ManagedBy: "terraform"}` |
 
 ## Outputs
 
@@ -45,83 +42,23 @@ Create a private-only VPC with multi-AZ tier-based subnets (web, app, db), VPC e
 - **aws_network_acl_rule** (multiple): Tier-specific ingress/egress rules
 - **aws_security_group**: For VPC endpoint access (HTTPS 443)
 
-## Implementation Steps
-
-1. **Create VPC** (`main.tf`)
-   - Resource: `aws_vpc`
-   - Inputs: `vpc_cidr`, enable DNS hostnames & support
-   - Output: `vpc_id`
-   - Tags: Common tags + Name
-
-2. **Create VPC Endpoints Security Group** (`main.tf`)
-   - Resource: `aws_security_group`
-   - Rules: Inbound HTTPS (443) from VPC CIDR
-   - Output: `vpc_endpoint_sg_id`
-   - Dependencies: VPC from step 1
-
-3. **Create Optional VPC Flow Logs** (`main.tf`) - Conditional on `enable_flow_logs`
-   - Resources: `aws_flow_log`, `aws_cloudwatch_log_group`, `aws_iam_role`, `aws_iam_role_policy`
-   - Retention: `flow_logs_retention_days`
-   - Dependencies: VPC from step 1
-
-4. **Create Tier-based Subnets** (`subnets.tf`)
-   - Resources: `aws_subnet` (6 total: 2 web, 2 app, 2 db)
-   - Logic: `for_each` over `local.subnets_by_tier` mapping availability zones to CIDR blocks
-   - Inputs: `private_subnet_cidrs`, `availability_zones`
-   - Output: `private_subnet_ids_by_tier`, `private_subnet_cidrs_by_tier`
-   - Dependencies: VPC from step 1
-
-5. **Create Tier-specific Route Tables** (`route_tables.tf`)
-   - Resources: `aws_route_table` (3 total: web, app, db)
-   - Logic: One per tier with local route to VPC CIDR
-   - Output: `private_route_table_ids_by_tier`
-   - Dependencies: VPC from step 1
-
-6. **Associate Subnets to Route Tables** (`route_tables.tf`)
-   - Resources: `aws_route_table_association` (6 total)
-   - Logic: `for_each` for each tier's subnets
-   - Dependencies: Subnets (step 4), Route tables (step 5)
-
-7. **Create Tier-specific Network ACLs** (`nacls.tf`)
-   - Resources: `aws_network_acl` (3 total: web, app, db)
-   - Logic: Inline subnet association via `subnet_ids`
-   - Output: `nacl_ids_by_tier`
-   - Dependencies: Subnets from step 4
-
-8. **Define NACL Rules** (`nacls.tf`)
-   - Resources: `aws_network_acl_rule` (multiple)
-   - Logic: `for_each` over tier CIDR blocks from `local.subnets_by_tier`
-   - Rules per tier:
-     - **Web**: Inbound from app tier (1024-65535), Outbound to app (8080-65535) + HTTPS (443) + DNS (53)
-     - **App**: Inbound from web tier (1024-65535), Outbound to db (5432) + HTTPS (443) + DNS (53)
-     - **DB**: Inbound from app tier (5432), Outbound HTTPS (443) + DNS (53)
-   - Dependencies: NACLs from step 7
-
-9. **Create VPC Endpoints** (`vpc_endpoints.tf`) - Conditional on `vpc_endpoint_services`
-   - Resources: `aws_vpc_endpoint` (gateway + interface)
-   - Logic: Separate gateway (s3, dynamodb) from interface endpoints via locals
-   - Gateway endpoints: Associated with app tier route table
-   - Interface endpoints: Deployed to app tier subnets only
-   - Output: `vpc_endpoint_ids`, `vpc_endpoint_arns`
-   - Dependencies: VPC from step 1, Route tables (step 5), Subnets (step 4), Security group (step 2)
-
 ## Security
 
 ### Network ACLs (Tier-Specific)
 **Web Tier**:
 - Inbound: Allow from app tier (dynamic ports 1024-65535)
 - Outbound: Allow to app tier (8080-65535), VPC endpoints (443), DNS (53)
-- Blocking: Direct communication with database tier
+- Block: Direct app-to-web traffic and database tier traffic
 
 **App Tier**:
 - Inbound: Allow from web tier (dynamic ports 1024-65535)
-- Outbound: Allow to db tier (5432), VPC endpoints/gateways (443), DNS (53)
-- Blocking: Direct communication from web tier to database tier
+- Outbound: Allow to db tier (5432), S3/DynamoDB gateway endpoints (via route table), VPC endpoints (443), DNS (53)
+- Block: Direct app-to-web traffic and web-to-db traffic
 
 **Database Tier**:
-- Inbound: Allow from app tier (5432 only)
+- Inbound: Allow from app tier (5432) only
 - Outbound: Allow VPC endpoints (443), DNS (53)
-- Blocking: All other inbound traffic except from app tier
+- Block: All other inbound traffic and unnecessary outbound traffic
 
 ### Security Groups
 - **VPC Endpoint SG**: Allow inbound HTTPS (443) from VPC CIDR
@@ -200,9 +137,11 @@ tofu destroy -auto-approve
 
 ## Notes
 - No NAT gateway needed (services are fully private, AWS traffic via VPC endpoints)
+- VPC endpoints are optional: pass desired services via `vpc_endpoint_services` variable
+- Services are automatically classified: s3/dynamodb = gateway endpoints, others = interface endpoints
 - Tier-based NACL rules enforce network segmentation without security groups
 - S3/DynamoDB prefix list IDs can be obtained: `aws ec2 describe-prefix-lists --filter Name=prefix-list-name,Values="com.amazonaws.region.s3"`
-- VPC endpoint pricing: ~$7.20/month per endpoint + data transfer
+- VPC endpoint pricing: Gateway endpoints are free (data transfer only), Interface endpoints ~$7.20/month per endpoint + data transfer
 - Consider VPC Flow Logs for security auditing (not included in this module)
 - NACL rules are stateless (must define both inbound and outbound)
 - Route tables use prefix list IDs for S3/DynamoDB routing (reduces internet gateway requirement)

@@ -62,6 +62,67 @@ Deploy CloudFront distributions for frontend and API with VPC origin support, We
 - **aws_cloudfront_origin_request_policy**: Origin request headers
 - **aws_cloudfront_response_headers_policy**: Security headers (HSTS, X-Frame-Options, etc.)
 
+## Implementation Steps
+
+1. **Create CloudFront OAI** (`oai.tf`)
+   - Resource: `aws_cloudfront_origin_access_identity`
+   - Purpose: Allow CloudFront to access S3 bucket without public access
+   - Output: `cloudfront_oai_id`
+
+2. **Create WAF Web ACL** (`waf.tf`)
+   - Resource: `aws_wafv2_web_acl`
+   - Rules: (see steps 3-6)
+   - Association: Attach to CloudFront distributions
+   - Output: `waf_web_acl_arn`, `waf_web_acl_id`
+
+3. **Add AWS Managed Rules** (`waf_rules.tf`)
+   - Resources: `aws_wafv2_rule` (per managed rule)
+   - Rules: 
+     - AWSManagedRulesCommonRuleSet (SQL injection, XSS, etc.)
+     - AWSManagedRulesAmazonIpReputationList (malicious IPs)
+     - AWSManagedRulesKnownBadInputsRuleSet (attack patterns)
+   - Dependencies: Web ACL from step 2
+
+4. **Add Rate Limiting Rule** (`waf_rate_limit.tf`) - Conditional on `enable_rate_limiting`
+   - Resources: `aws_wafv2_ip_set`, `aws_wafv2_rule`
+   - Input: `rate_limit_threshold`
+   - Action: Block IPs exceeding threshold in 5-minute window
+
+5. **Add Geo-Blocking Rule** (`waf_geo_block.tf`) - Conditional on `enable_geo_blocking`
+   - Resource: `aws_wafv2_rule`
+   - Inputs: `allowed_countries`, `blocked_countries`
+   - Action: Allow/Block by country code (ISO 3166-1 alpha-2)
+
+6. **Create CloudFront Cache Policy** (`cache_policy.tf`)
+   - Resource: `aws_cloudfront_cache_policy`
+   - Inputs: `cache_default_ttl`, `cache_max_ttl`, `cache_min_ttl`
+   - Compression: Enabled
+
+7. **Create Security Headers Policy** (`headers_policy.tf`)
+   - Resource: `aws_cloudfront_response_headers_policy`
+   - Headers: HSTS, X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy
+   - Purpose: Enforce security best practices
+
+8. **Create API CloudFront Distribution** (`distributions.tf`)
+   - Resource: `aws_cloudfront_distribution`
+   - Origin: ALB (private, VPC origin)
+   - Viewer Policy: `redirect-to-https`
+   - Cache Policy: From step 6
+   - Headers Policy: From step 7
+   - WAF: From step 2
+   - Input: `alb_dns_name`, `certificate_arn` (if custom domain)
+   - Output: `cloudfront_api_distribution_id`, `cloudfront_api_domain_name`
+
+9. **Create Frontend CloudFront Distribution** (`distributions.tf`)
+   - Resource: `aws_cloudfront_distribution`
+   - Origin: S3 bucket with OAI (step 1)
+   - Viewer Policy: `redirect-to-https`
+   - Cache Policy: From step 6
+   - Headers Policy: From step 7
+   - WAF: From step 2
+   - Input: `s3_bucket_domain_name`, `certificate_arn` (if custom domain)
+   - Output: `cloudfront_frontend_distribution_id`, `cloudfront_frontend_domain_name`
+
 ## Security
 
 ### WAF Rules

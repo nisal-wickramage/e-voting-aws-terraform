@@ -59,6 +59,55 @@ Enable automated backups, snapshots, and cross-region replication for RDS and S3
 - **aws_sns_topic**: Notifications for backup failures
 - **local_file**: DR runbook documentation (optional)
 
+## Implementation Steps
+
+1. **Configure RDS Automated Backups** (`rds_backups.tf`)
+   - Resource: Reference aws_db_instance from database module (update with backup settings)
+   - Settings: `backup_retention_days`, `backup_window`
+   - Output: Backup window and retention info for documentation
+
+2. **Create AWS Backup Vault** (`backup_vault.tf`) - Optional centralized backup
+   - Resource: `aws_backup_vault`
+   - Encryption: AWS managed or KMS key
+   - Locks: MFA delete protection (for prod)
+
+3. **Create RDS Snapshot Schedule** (`rds_snapshots.tf`) - Conditional on `enable_rds_snapshots`
+   - Resources: `aws_backup_plan`, `aws_backup_selection`
+   - Or: `aws_lambda_function` + `aws_events_rule` (for manual snapshot control)
+   - Input: `rds_snapshot_schedule` (cron)
+   - Retention: `rds_snapshot_retention_days`
+
+4. **Enable S3 Versioning** (`s3_versioning.tf`) - Conditional on `enable_s3_versioning`
+   - Resource: `aws_s3_bucket_versioning` (from s3-frontend module)
+   - Purpose: Enable recovery from accidental deletion/overwrite
+
+5. **Configure S3 Lifecycle Policy** (`s3_lifecycle.tf`)
+   - Resource: `aws_s3_bucket_lifecycle_configuration`
+   - Policy: Delete noncurrent versions after `s3_version_retention_days`
+   - Purpose: Cost optimization while maintaining recovery capability
+
+6. **Create S3 Cross-Region Replication** (`s3_replication.tf`) - Conditional on `enable_s3_cross_region_replication`
+   - Resources: `aws_s3_bucket_replication_configuration`, `aws_iam_role`, `aws_iam_role_policy`
+   - Inputs: `s3_replica_bucket_name`, `s3_replica_region`
+   - Destination: Replica bucket in different region
+   - Replication: All objects or filtered by prefix
+
+7. **Create RDS Cross-Region Backup Copy** (`rds_cross_region.tf`) - Conditional on `enable_rds_cross_region_backup`
+   - Resources: `aws_backup_region_copy_plan` or Lambda + copy snapshots
+   - Input: `rds_backup_destination_region`
+   - Purpose: Protect against region-wide outages
+   - Retention: Same as primary backups
+
+8. **Create Backup Failure Alarms** (`alarms.tf`)
+   - Resources: `aws_cloudwatch_metric_alarm` (per service)
+   - Alarms: RDS backup failed, S3 replication lagging
+   - Notifications: SNS topic for ops team
+
+9. **Generate DR Runbook** (`runbook.tf`) - Conditional on `enable_dr_runbook`
+   - Resource: `local_file` or template_file
+   - Content: Recovery procedures for RDS and S3, estimated RTO/RPO
+   - Output: `disaster_recovery_runbook_url`
+
 ## Security
 
 ### Access Control

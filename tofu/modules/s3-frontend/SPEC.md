@@ -52,6 +52,54 @@ Create a private S3 bucket for static frontend assets (SPA) with versioning, enc
 - **aws_iam_role** (if replication enabled): Replication role
 - **aws_s3_bucket_logging** (optional): Access logs to separate bucket
 
+## Implementation Steps
+
+1. **Create S3 Bucket** (`main.tf`)
+   - Resource: `aws_s3_bucket`
+   - Input: `bucket_name` (globally unique)
+   - Output: `bucket_id`, `bucket_arn`, `bucket_domain_name`
+
+2. **Enable Versioning** (`main.tf`)
+   - Resource: `aws_s3_bucket_versioning`
+   - Condition: `enable_versioning == true`
+   - Purpose: Enable disaster recovery and accidental deletion protection
+
+3. **Enable Encryption** (`encryption.tf`)
+   - Resource: `aws_s3_bucket_server_side_encryption_configuration`
+   - Condition: `enable_server_side_encryption == true`
+   - Encryption: SSE-S3 (AWS managed keys)
+
+4. **Block Public Access** (`security.tf`)
+   - Resource: `aws_s3_bucket_public_access_block`
+   - Condition: `enable_public_access_block == true`
+   - Block: All public ACLs and bucket policies
+
+5. **Create Bucket Policy** (`policy.tf`)
+   - Resource: `aws_s3_bucket_policy`
+   - Input: `cloudfront_oai_id` from cdn-waf module
+   - Policy: Allow CloudFront OAI GET/HEAD only, deny all public access
+   - Output: `bucket_policy_statement`
+
+6. **Enable CORS** (`cors.tf`) - Conditional on `enable_cors`
+   - Resource: `aws_s3_bucket_cors_configuration`
+   - Input: `cors_allowed_origins`
+   - Methods: GET, PUT, POST
+
+7. **Configure Lifecycle Policy** (`lifecycle.tf`) - Optional
+   - Resource: `aws_s3_bucket_lifecycle_configuration`
+   - Input: `lifecycle_transition_days`
+   - Transitions: Glacier after specified days for cost optimization
+
+8. **Enable Cross-Region Replication** (`replication.tf`) - Conditional on `enable_cross_region_replication`
+   - Resources: `aws_s3_bucket_replication_configuration`, `aws_iam_role`, `aws_iam_role_policy`
+   - Inputs: `replication_destination_bucket`, `replication_destination_region`
+   - Purpose: Disaster recovery with replicated assets
+
+9. **Enable Access Logging** (`logging.tf`) - Conditional on `enable_access_logs`
+   - Resource: `aws_s3_bucket_logging`
+   - Input: `access_logs_bucket`
+   - Purpose: Audit trail for S3 access
+
 ## Security
 
 ### Access Control
