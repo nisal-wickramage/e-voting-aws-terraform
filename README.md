@@ -172,7 +172,6 @@ choco install terragrunt
 ```bash
 docker run -d --name localstack \
   -p 4566:4566 \
-  -e SERVICES=ec2,rds,s3,elasticloadbalancing,ecs,cloudwatch \
   -e DOCKER_HOST=unix:///var/run/docker.sock \
   localstack/localstack:4.4.0
 
