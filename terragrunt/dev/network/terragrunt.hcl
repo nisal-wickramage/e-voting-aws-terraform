@@ -1,4 +1,4 @@
-# Network Module Configuration
+# Network Module - Development Environment Configuration (AWS)
 
 include "root" {
   path = "../../terragrunt.hcl"
