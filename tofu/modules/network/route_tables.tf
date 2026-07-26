@@ -1,11 +1,10 @@
-# Step 5 & 6: Create Tier-specific Route Tables and Associate Subnets
-# Creates 3 route tables (one per tier: web, app, db) with local routes
-# Associates all 6 subnets to their respective tier route table
+# Step 5 & 6: Create Single Route Table and Associate All Subnets
+# Creates 1 route table for all tiers with local routes
+# NACLs handle tier-specific traffic filtering
+# Associates all 6 subnets to the single route table
 
-# Step 5: Create Route Tables for each tier
-resource "aws_route_table" "tier" {
-  for_each = toset(["web", "app", "db"])
-
+# Step 5: Create Single Route Table for all subnets
+resource "aws_route_table" "main" {
   vpc_id = aws_vpc.main.id
 
   # Local route for VPC CIDR (automatically created but explicit for clarity)
@@ -17,16 +16,15 @@ resource "aws_route_table" "tier" {
   tags = merge(
     var.common_tags,
     {
-      Name = "${var.project_name}-${each.value}-rt"
-      Tier = each.value
+      Name = "${var.project_name}-main-rt"
     }
   )
 }
 
-# Step 6: Associate subnets to their tier-specific route tables
-resource "aws_route_table_association" "subnet_to_tier_rt" {
+# Step 6: Associate all subnets to the single route table
+resource "aws_route_table_association" "subnet_to_main_rt" {
   for_each = local.all_subnets
 
   subnet_id      = aws_subnet.private[each.key].id
-  route_table_id = aws_route_table.tier[each.value.tier].id
+  route_table_id = aws_route_table.main.id
 }

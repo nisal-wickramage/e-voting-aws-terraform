@@ -63,7 +63,7 @@ resource "aws_vpc_endpoint" "gateway" {
   vpc_id              = aws_vpc.main.id
   service_name        = local.service_name_map[each.value]
   vpc_endpoint_type   = "Gateway"
-  route_table_ids     = [for rt in aws_route_table.tier : rt.id]
+  route_table_ids     = [aws_route_table.main.id]
 
   tags = merge(
     var.common_tags,

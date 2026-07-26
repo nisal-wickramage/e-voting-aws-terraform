@@ -73,12 +73,9 @@ output "nacl_ids_by_tier" {
   }
 }
 
-output "private_route_table_ids_by_tier" {
-  description = "Route table IDs by tier (web, app, db)"
-  value = {
-    for tier, rt in aws_route_table.tier :
-    tier => rt.id
-  }
+output "private_route_table_id" {
+  description = "Route table ID (single table for all tiers, NACLs enforce tier separation)"
+  value       = aws_route_table.main.id
 }
 
 output "subnets_by_tier_with_azs" {
