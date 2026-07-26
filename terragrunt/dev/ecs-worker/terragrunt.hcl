@@ -50,7 +50,11 @@ inputs = {
   container_memory = 512
   container_cpu    = 256
   desired_count    = 2
-
+  # ECR Configuration
+  enable_ecr            = true
+  image_tag_mutability  = "MUTABLE"
+  image_scan_on_push    = true
+  ecr_retention_days    = 30
   # Network Configuration
   ecs_security_group_ids      = [dependency.platform.outputs.ecs_security_group_id]
   ecs_subnet_ids              = dependency.network.outputs.private_subnet_ids_by_tier["app"]

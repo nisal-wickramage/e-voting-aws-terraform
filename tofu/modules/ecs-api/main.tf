@@ -317,3 +317,47 @@ resource "aws_cloudwatch_metric_alarm" "alb_target_health" {
 
   tags = var.common_tags
 }
+
+# ECR Repository for service container images
+resource "aws_ecr_repository" "service" {
+  count = var.enable_ecr ? 1 : 0
+
+  name                 = "${var.project_name}-${var.service_name}"
+  image_tag_mutability = var.image_tag_mutability
+
+  image_scanning_configuration {
+    scan_on_push = var.image_scan_on_push
+  }
+
+  tags = merge(
+    var.common_tags,
+    {
+      Name = "${var.project_name}-${var.service_name}"
+    }
+  )
+}
+
+# ECR Lifecycle Policy (retention)
+resource "aws_ecr_lifecycle_policy" "service" {
+  count = var.enable_ecr ? 1 : 0
+
+  repository = aws_ecr_repository.service[0].name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Keep last ${var.ecr_retention_days} days of images"
+        selection = {
+          tagStatus     = "any"
+          countType     = "sinceImagePushed"
+          countUnit     = "days"
+          countNumber   = var.ecr_retention_days
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  })
+}

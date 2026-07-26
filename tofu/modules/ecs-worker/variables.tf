@@ -27,7 +27,38 @@ variable "service_name" {
     error_message = "Service name must be 1-255 characters."
   }
 }
+# ECR Configuration
+variable "enable_ecr" {
+  description = "Create ECR repository for this service"
+  type        = bool
+  default     = true
+}
 
+variable "image_tag_mutability" {
+  description = "Enable image tag mutability (allow overwrite)"
+  type        = string
+  default     = "MUTABLE"
+  validation {
+    condition     = contains(["MUTABLE", "IMMUTABLE"], var.image_tag_mutability)
+    error_message = "Must be MUTABLE or IMMUTABLE."
+  }
+}
+
+variable "image_scan_on_push" {
+  description = "Enable ECR image scanning on push"
+  type        = bool
+  default     = true
+}
+
+variable "ecr_retention_days" {
+  description = "Days to keep old ECR images before deletion"
+  type        = number
+  default     = 30
+  validation {
+    condition     = var.ecr_retention_days > 0 && var.ecr_retention_days <= 1000
+    error_message = "Retention must be between 1 and 1000 days."
+  }
+}
 variable "container_image" {
   description = "Container image URI for worker service"
   type        = string

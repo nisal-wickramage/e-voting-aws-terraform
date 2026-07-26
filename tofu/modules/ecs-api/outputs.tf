@@ -59,3 +59,18 @@ output "listener_rule_arn" {
   description = "ALB listener rule ARN"
   value       = aws_lb_listener_rule.service.arn
 }
+
+output "ecr_repository_url" {
+  description = "ECR repository URL for pushing container images"
+  value       = var.enable_ecr ? aws_ecr_repository.service[0].repository_url : null
+}
+
+output "ecr_repository_name" {
+  description = "ECR repository name"
+  value       = var.enable_ecr ? aws_ecr_repository.service[0].name : null
+}
+
+output "ecr_repository_arn" {
+  description = "ECR repository ARN"
+  value       = var.enable_ecr ? aws_ecr_repository.service[0].arn : null
+}
