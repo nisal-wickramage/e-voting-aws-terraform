@@ -38,23 +38,6 @@ dependency "database" {
   }
 }
 
-dependency "ecs_async_api" {
-  config_path = "../ecs-async-api"
-  
-  mock_outputs = {
-    sqs_queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/e-voting-async-api-requests"
-    sqs_queue_arn = "arn:aws:sqs:us-east-1:123456789012:e-voting-async-api-requests"
-  }
-}
-
-dependency "ecs_migrations" {
-  config_path = "../ecs-migrations"
-  
-  mock_outputs = {
-    db_credentials_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:e-voting-db-credentials-XXXXXX"
-  }
-}
-
 inputs = {
   # ECS Cluster
   cluster_name = dependency.platform.outputs.ecs_cluster_name
@@ -73,15 +56,15 @@ inputs = {
   ecs_subnet_ids              = dependency.network.outputs.private_subnet_ids_by_tier["app"]
   ecs_task_execution_role_arn = dependency.platform.outputs.ecs_task_execution_role_arn
 
-  # SQS Queue from async-api
-  sqs_queue_url = dependency.ecs_async_api.outputs.sqs_queue_url
-  sqs_queue_arn = dependency.ecs_async_api.outputs.sqs_queue_arn
+  # SQS Queue (provide via environment variable)
+  sqs_queue_url = get_env("SQS_QUEUE_URL", "https://sqs.us-east-1.amazonaws.com/123456789012/e-voting-async-api-requests")
+  sqs_queue_arn = get_env("SQS_QUEUE_ARN", "arn:aws:sqs:us-east-1:123456789012:e-voting-async-api-requests")
 
   # Database Configuration
   db_host                   = dependency.database.outputs.rds_address
   db_port                   = dependency.database.outputs.rds_port
   db_name                   = "evoting"
-  db_credentials_secret_arn = dependency.ecs_migrations.outputs.db_credentials_secret_arn
+  db_credentials_secret_arn = get_env("DB_CREDENTIALS_SECRET_ARN", "arn:aws:secretsmanager:us-east-1:123456789012:secret:e-voting-db-credentials-XXXXXX")
 
   # Environment
   environment  = "dev"
