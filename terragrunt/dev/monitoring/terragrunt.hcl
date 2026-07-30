@@ -12,9 +12,9 @@ dependency "platform" {
   config_path = "../platform"
 
   mock_outputs = {
-    alb_name                = "e-voting-alb"
-    alb_target_group_name   = "e-voting-api-tg"
-    ecs_cluster_name        = "e-voting-cluster"
+    alb_name                  = "e-voting-alb"
+    default_target_group_name = "e-voting-default-tg"
+    ecs_cluster_name          = "e-voting-cluster"
   }
 }
 
@@ -22,7 +22,7 @@ dependency "database" {
   config_path = "../database"
 
   mock_outputs = {
-    rds_cluster_id = "e-voting-dev-cluster"
+    rds_identifier = "e-voting-dev-db"
   }
 }
 
@@ -32,11 +32,11 @@ inputs = {
 
   # ALB Configuration
   alb_name                    = dependency.platform.outputs.alb_name
-  alb_target_group_name       = dependency.platform.outputs.alb_target_group_name
+  alb_target_group_name     = dependency.platform.outputs.default_target_group_name
   unhealthy_target_threshold  = 1
 
   # RDS Configuration
-  rds_cluster_id       = dependency.database.outputs.rds_cluster_id
+  rds_identifier       = dependency.database.outputs.rds_identifier
   rds_cpu_threshold    = 80
   rds_memory_threshold = 500000000  # 500 MB
 

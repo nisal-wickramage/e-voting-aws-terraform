@@ -12,14 +12,14 @@ dependency "database" {
   config_path = "../database"
 
   mock_outputs = {
-    rds_cluster_id = "e-voting-dev-cluster"
+    rds_identifier = "e-voting-dev-db"
   }
 }
 
 inputs = {
   project_name  = "e-voting"
   environment   = "dev"
-  rds_cluster_id = dependency.database.outputs.rds_cluster_id
+  rds_identifier = dependency.database.outputs.rds_identifier
 
   # Backup Configuration
   rds_backup_retention_days = 7

@@ -19,14 +19,21 @@ dependency "network" {
   }
 }
 
+dependency "platform" {
+  config_path = "../platform"
+
+  mock_outputs = {
+    ecs_security_group_id = "sg-mock"
+  }
+}
+
 inputs = {
   # Network configuration from network module
   vpc_id             = dependency.network.outputs.vpc_id
   private_subnet_ids = dependency.network.outputs.private_subnet_ids_by_tier["db"]
   
-  # ECS configuration - pass security group ID as input (from platform module)
-  # For standalone database deployment, use a placeholder; platform will provide the actual SG
-  ecs_security_group_id = get_env("ECS_SECURITY_GROUP_ID", "sg-placeholder")
+  # ECS configuration from platform module
+  ecs_security_group_id = dependency.platform.outputs.ecs_security_group_id
 
   # RDS Configuration (smallest instance for cost)
   db_instance_class       = "db.t3.micro"

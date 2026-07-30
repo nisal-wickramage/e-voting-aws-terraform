@@ -212,7 +212,7 @@ resource "aws_cloudfront_distribution" "s3" {
     origin_id   = "s3-origin"
 
     s3_origin_config {
-      origin_access_identity = "origin-access-identity/cloudfront/${replace(var.cloudfront_oai_iam_arn, "/.*\\/(.*)/", "$1")}"
+      origin_access_identity = "origin-access-identity/cloudfront/${var.cloudfront_oai_id}"
     }
   }
 

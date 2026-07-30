@@ -65,7 +65,7 @@ resource "aws_cloudwatch_metric_alarm" "rds_cpu_utilization" {
   treat_missing_data  = var.treat_missing_data
 
   dimensions = {
-    DBClusterIdentifier = var.rds_cluster_id
+    DBInstanceIdentifier = var.rds_identifier
   }
 
   tags = merge(var.tags, {
@@ -89,7 +89,7 @@ resource "aws_cloudwatch_metric_alarm" "rds_memory_utilization" {
   treat_missing_data  = var.treat_missing_data
 
   dimensions = {
-    DBClusterIdentifier = var.rds_cluster_id
+    DBInstanceIdentifier = var.rds_identifier
   }
 
   tags = merge(var.tags, {
@@ -113,7 +113,7 @@ resource "aws_cloudwatch_metric_alarm" "rds_database_connections" {
   treat_missing_data  = "breaching"  # Treat missing as breach (indicates outage)
 
   dimensions = {
-    DBClusterIdentifier = var.rds_cluster_id
+    DBInstanceIdentifier = var.rds_identifier
   }
 
   tags = merge(var.tags, {
@@ -270,9 +270,9 @@ resource "aws_cloudwatch_dashboard" "monitoring" {
         type = "metric"
         properties = {
           metrics = [
-            ["AWS/RDS", "CPUUtilization", { stat = "Average", label = "CPU %", dimensions = { DBClusterIdentifier = var.rds_cluster_id } }],
-            [".", "FreeableMemory", { stat = "Average", label = "Free Memory (bytes)", dimensions = { DBClusterIdentifier = var.rds_cluster_id } }],
-            [".", "DatabaseConnections", { stat = "Average", label = "Connections", dimensions = { DBClusterIdentifier = var.rds_cluster_id } }]
+            ["AWS/RDS", "CPUUtilization", { stat = "Average", label = "CPU %", dimensions = { DBInstanceIdentifier = var.rds_identifier } }],
+            [".", "FreeableMemory", { stat = "Average", label = "Free Memory (bytes)", dimensions = { DBInstanceIdentifier = var.rds_identifier } }],
+            [".", "DatabaseConnections", { stat = "Average", label = "Connections", dimensions = { DBInstanceIdentifier = var.rds_identifier } }]
           ]
           period = 300
           stat   = "Average"

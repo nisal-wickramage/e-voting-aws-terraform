@@ -39,7 +39,7 @@ resource "aws_cloudwatch_metric_alarm" "rds_backup_failed" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    DBClusterIdentifier = var.rds_cluster_id
+    DBInstanceIdentifier = var.rds_identifier
   }
 
   tags = merge(var.tags, {
@@ -65,7 +65,7 @@ resource "aws_cloudwatch_metric_alarm" "rds_backup_storage" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    DBClusterIdentifier = var.rds_cluster_id
+    DBInstanceIdentifier = var.rds_identifier
   }
 
   tags = merge(var.tags, {
@@ -120,14 +120,14 @@ resource "aws_iam_role_policy" "rds_backup_automation_policy" {
       {
         Effect = "Allow"
         Action = [
-          "rds:CreateDBClusterSnapshot",
-          "rds:DescribeDBClusters",
-          "rds:DescribeDBClusterSnapshots",
-          "rds:DeleteDBClusterSnapshot"
+          "rds:CreateDBSnapshot",
+          "rds:DescribeDBInstances",
+          "rds:DescribeDBSnapshots",
+          "rds:DeleteDBSnapshot"
         ]
         Resource = [
-          "arn:aws:rds:*:*:cluster:${var.rds_cluster_id}",
-          "arn:aws:rds:*:*:cluster-snapshot:*"
+          "arn:aws:rds:*:*:db:${var.rds_identifier}",
+          "arn:aws:rds:*:*:snapshot:*"
         ]
       },
       {
@@ -178,10 +178,10 @@ resource "aws_cloudwatch_event_target" "daily_rds_snapshot_sns" {
       time = "$.time"
     }
     input_template = jsonencode({
-      Action      = "CreateDBClusterSnapshot"
-      ClusterId   = var.rds_cluster_id
-      SnapshotId  = "${var.project_name}-${var.environment}-snapshot-<time>"
-      TriggeredAt = "<time>"
+      Action         = "CreateDBSnapshot"
+      DBInstanceId   = var.rds_identifier
+      SnapshotId     = "${var.project_name}-${var.environment}-snapshot-<time>"
+      TriggeredAt    = "<time>"
     })
   }
 }

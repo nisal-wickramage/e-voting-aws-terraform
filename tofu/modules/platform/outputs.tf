@@ -73,7 +73,23 @@ output "alb_listener_arn" {
   value       = aws_lb_listener.default.arn
 }
 
+output "alb_name" {
+  description = "ALB name (for monitoring and identification)"
+  value       = aws_lb.main.name
+}
+
 output "subnets_used" {
   description = "Private subnets used by ALB"
   value       = var.private_subnet_ids
+}
+
+# IAM Roles
+output "ecs_task_execution_role_arn" {
+  description = "ECS task execution role ARN (for pulling images and logs)"
+  value       = aws_iam_role.ecs_task_execution_role.arn
+}
+
+output "ecs_task_role_arn" {
+  description = "ECS task role ARN (for task-level permissions)"
+  value       = aws_iam_role.ecs_task_role.arn
 }

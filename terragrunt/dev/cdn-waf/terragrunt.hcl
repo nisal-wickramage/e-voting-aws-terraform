@@ -21,6 +21,7 @@ dependency "s3_frontend" {
 
   mock_outputs = {
     bucket_regional_domain_name = "bucket.s3.us-east-1.amazonaws.com"
+    cloudfront_oai_id           = "E12345EXAMPLE"
     cloudfront_oai_iam_arn      = "arn:aws:iam::123456789012:root"
   }
 }
@@ -31,6 +32,7 @@ inputs = {
   alb_domain_name                   = dependency.platform.outputs.alb_dns_name
   alb_origin_path                   = "/api"
   s3_bucket_regional_domain_name    = dependency.s3_frontend.outputs.bucket_regional_domain_name
+  cloudfront_oai_id                = dependency.s3_frontend.outputs.cloudfront_oai_id
   cloudfront_oai_iam_arn           = dependency.s3_frontend.outputs.cloudfront_oai_iam_arn
 
   # WAF Configuration

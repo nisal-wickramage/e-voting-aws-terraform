@@ -34,9 +34,14 @@ variable "s3_bucket_regional_domain_name" {
   description = "S3 bucket regional domain name (e.g., bucket.s3.us-east-1.amazonaws.com)"
 }
 
+variable "cloudfront_oai_id" {
+  type        = string
+  description = "CloudFront Origin Access Identity ID (not the ARN)"
+}
+
 variable "cloudfront_oai_iam_arn" {
   type        = string
-  description = "CloudFront OAI IAM ARN for S3 bucket access"
+  description = "CloudFront OAI IAM ARN for S3 bucket policy"
 }
 
 # WAF Configuration

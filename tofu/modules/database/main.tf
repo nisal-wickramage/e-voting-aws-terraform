@@ -47,7 +47,7 @@ resource "aws_security_group" "rds" {
 resource "aws_db_instance" "main" {
   identifier              = "${var.project_name}-db"
   engine                  = "postgres"
-  engine_version          = "15.4"
+  engine_version          = "15"
   instance_class          = var.db_instance_class
   allocated_storage       = var.db_allocated_storage
   db_name                 = var.db_name
@@ -70,7 +70,7 @@ resource "aws_db_instance" "main" {
 
   # Performance and monitoring
   performance_insights_enabled    = var.environment != "dev" ? true : false
-  performance_insights_retention_period = 7
+  performance_insights_retention_period = var.environment != "dev" ? 7 : null
   enabled_cloudwatch_logs_exports = ["postgresql"]
 
   tags = merge(
@@ -90,14 +90,16 @@ resource "aws_db_parameter_group" "main" {
 
   # Log all statements for audit
   parameter {
-    name  = "log_statement"
-    value = var.environment == "prod" ? "ddl" : "all"
+    name         = "log_statement"
+    value        = var.environment == "prod" ? "ddl" : "all"
+    apply_method = "pending-reboot"
   }
 
   # Connection pooling friendly settings
   parameter {
-    name  = "max_connections"
-    value = var.environment == "dev" ? "100" : "200"
+    name         = "max_connections"
+    value        = var.environment == "dev" ? "100" : "200"
+    apply_method = "pending-reboot"
   }
 
   tags = merge(

@@ -34,9 +34,9 @@ variable "unhealthy_target_threshold" {
 }
 
 # RDS Configuration
-variable "rds_cluster_id" {
+variable "rds_identifier" {
   type        = string
-  description = "RDS cluster identifier"
+  description = "RDS database identifier (instance ID or cluster ID)"
 }
 
 variable "rds_cpu_threshold" {
