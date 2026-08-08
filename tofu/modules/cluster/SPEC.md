@@ -1,4 +1,4 @@
-# Platform Module Specification
+# Cluster Module Specification
 
 ## Purpose
 Create ECS cluster and Application Load Balancer foundation in private subnets, providing compute orchestration and traffic distribution for microservices.

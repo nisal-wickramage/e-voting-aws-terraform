@@ -18,8 +18,8 @@ dependency "network" {
   }
 }
 
-dependency "platform" {
-  config_path = "../platform"
+dependency "cluster" {
+  config_path = "../cluster"
   
   mock_outputs = {
     ecs_cluster_name            = "e-voting-cluster-mock"
@@ -40,8 +40,8 @@ dependency "database" {
 
 inputs = {
   # ECS Cluster
-  cluster_name = dependency.platform.outputs.ecs_cluster_name
-  cluster_arn  = dependency.platform.outputs.ecs_cluster_arn
+  cluster_name = dependency.cluster.outputs.ecs_cluster_name
+  cluster_arn  = dependency.cluster.outputs.ecs_cluster_arn
 
   # Service Configuration
   service_name = "worker"
@@ -56,9 +56,9 @@ inputs = {
   image_scan_on_push    = true
   ecr_retention_days    = 30
   # Network Configuration
-  ecs_security_group_ids      = [dependency.platform.outputs.ecs_security_group_id]
+  ecs_security_group_ids      = [dependency.cluster.outputs.ecs_security_group_id]
   ecs_subnet_ids              = dependency.network.outputs.private_subnet_ids_by_tier["app"]
-  ecs_task_execution_role_arn = dependency.platform.outputs.ecs_task_execution_role_arn
+  ecs_task_execution_role_arn = dependency.cluster.outputs.ecs_task_execution_role_arn
 
   # SQS Queue (provide via environment variable)
   sqs_queue_url = get_env("SQS_QUEUE_URL", "https://sqs.us-east-1.amazonaws.com/123456789012/e-voting-async-api-requests")

@@ -8,8 +8,8 @@ terraform {
   source = "../../../tofu/modules/cdn-waf"
 }
 
-dependency "platform" {
-  config_path = "../platform"
+dependency "cluster" {
+  config_path = "../cluster"
   
   mock_outputs = {
     alb_dns_name = "alb-12345.us-east-1.elb.amazonaws.com"
@@ -29,7 +29,7 @@ dependency "s3_frontend" {
 inputs = {
   project_name                      = "e-voting"
   environment                       = "dev"
-  alb_domain_name                   = dependency.platform.outputs.alb_dns_name
+  alb_domain_name                   = dependency.cluster.outputs.alb_dns_name
   alb_origin_path                   = "/api"
   s3_bucket_regional_domain_name    = dependency.s3_frontend.outputs.bucket_regional_domain_name
   cloudfront_oai_id                = dependency.s3_frontend.outputs.cloudfront_oai_id

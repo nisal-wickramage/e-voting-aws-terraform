@@ -19,8 +19,8 @@ dependency "network" {
   }
 }
 
-dependency "platform" {
-  config_path = "../platform"
+dependency "cluster" {
+  config_path = "../cluster"
 
   mock_outputs = {
     ecs_security_group_id = "sg-mock"
@@ -33,7 +33,7 @@ inputs = {
   private_subnet_ids = dependency.network.outputs.private_subnet_ids_by_tier["db"]
   
   # ECS configuration from platform module
-  ecs_security_group_id = dependency.platform.outputs.ecs_security_group_id
+  ecs_security_group_id = dependency.cluster.outputs.ecs_security_group_id
 
   # RDS Configuration (smallest instance for cost)
   db_instance_class       = "db.t3.micro"

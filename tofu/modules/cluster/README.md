@@ -1,4 +1,4 @@
-# Platform Module
+# Cluster Module
 
 ## Purpose
 
@@ -66,8 +66,8 @@ This module provisions:
 ## Usage
 
 ```hcl
-module "platform" {
-  source = "./modules/platform"
+module "cluster" {
+  source = "./modules/cluster"
 
   vpc_id               = module.network.vpc_id
   private_subnet_ids   = module.network.private_subnet_ids_by_tier["app"]

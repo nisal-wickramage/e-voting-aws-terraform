@@ -18,8 +18,8 @@ dependency "network" {
   }
 }
 
-dependency "platform" {
-  config_path = "../platform"
+dependency "cluster" {
+  config_path = "../cluster"
   
   mock_outputs = {
     ecs_cluster_name            = "e-voting-cluster-mock"
@@ -32,8 +32,8 @@ dependency "platform" {
 
 inputs = {
   # ECS Cluster
-  cluster_name = dependency.platform.outputs.ecs_cluster_name
-  cluster_arn  = dependency.platform.outputs.ecs_cluster_arn
+  cluster_name = dependency.cluster.outputs.ecs_cluster_name
+  cluster_arn  = dependency.cluster.outputs.ecs_cluster_arn
 
   # Service Configuration
   service_name     = "async-api"
@@ -50,10 +50,10 @@ inputs = {
   ecr_retention_days    = 30
 
   # Network Configuration
-  ecs_security_group_ids      = [dependency.platform.outputs.ecs_security_group_id]
+  ecs_security_group_ids      = [dependency.cluster.outputs.ecs_security_group_id]
   ecs_subnet_ids              = dependency.network.outputs.private_subnet_ids_by_tier["app"]
-  ecs_task_execution_role_arn = dependency.platform.outputs.ecs_task_execution_role_arn
-  alb_target_group_arn        = dependency.platform.outputs.default_target_group_arn
+  ecs_task_execution_role_arn = dependency.cluster.outputs.ecs_task_execution_role_arn
+  alb_target_group_arn        = dependency.cluster.outputs.default_target_group_arn
 
   # SQS Configuration
   sqs_queue_name        = "async-api-requests"

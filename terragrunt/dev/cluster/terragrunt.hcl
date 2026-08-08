@@ -1,11 +1,11 @@
-# Platform Module - Development Environment Configuration (AWS)
+# Cluster Module - Development Environment Configuration (AWS)
 
 include "root" {
   path = "../../terragrunt.hcl"
 }
 
 terraform {
-  source = "../../../tofu/modules/platform"
+  source = "../../../tofu/modules/cluster"
 }
 
 dependency "network" {

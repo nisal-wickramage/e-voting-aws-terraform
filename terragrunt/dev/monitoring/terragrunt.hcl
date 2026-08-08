@@ -8,8 +8,8 @@ terraform {
   source = "../../../tofu/modules/monitoring"
 }
 
-dependency "platform" {
-  config_path = "../platform"
+dependency "cluster" {
+  config_path = "../cluster"
 
   mock_outputs = {
     alb_name                  = "e-voting-alb"
@@ -31,8 +31,8 @@ inputs = {
   environment   = "dev"
 
   # ALB Configuration
-  alb_name                    = dependency.platform.outputs.alb_name
-  alb_target_group_name     = dependency.platform.outputs.default_target_group_name
+  alb_name                    = dependency.cluster.outputs.alb_name
+  alb_target_group_name     = dependency.cluster.outputs.default_target_group_name
   unhealthy_target_threshold  = 1
 
   # RDS Configuration
@@ -47,7 +47,7 @@ inputs = {
   sqs_old_message_threshold_minutes = 60
 
   # ECS Configuration
-  ecs_cluster_name = dependency.platform.outputs.ecs_cluster_name
+  ecs_cluster_name = dependency.cluster.outputs.ecs_cluster_name
   ecs_service_names = [
     "e-voting-async-api",
     "e-voting-worker",
