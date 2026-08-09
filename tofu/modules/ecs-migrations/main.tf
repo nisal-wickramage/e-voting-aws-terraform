@@ -95,6 +95,16 @@ resource "aws_secretsmanager_secret_version" "db_credentials" {
 }
 
 
+# Build secrets array for task definition
+locals {
+  additional_secrets = [
+    for secret_name, secret_arn in var.secrets_arns : {
+      name      = upper(replace(secret_name, "-", "_"))
+      valueFrom = secret_arn
+    }
+  ]
+}
+
 # ECS Task Definition for database migrations
 resource "aws_ecs_task_definition" "migrations" {
   family                   = var.task_family_name
@@ -136,12 +146,15 @@ resource "aws_ecs_task_definition" "migrations" {
       ]
 
       # Secrets (sensitive data)
-      secrets = [
-        {
-          name      = "DB_PASSWORD"
-          valueFrom = aws_secretsmanager_secret.db_credentials.arn
-        }
-      ]
+      secrets = concat(
+        [
+          {
+            name      = "DB_PASSWORD"
+            valueFrom = aws_secretsmanager_secret.db_credentials.arn
+          }
+        ],
+        local.additional_secrets
+      )
 
       # Logging to CloudWatch
       logConfiguration = {

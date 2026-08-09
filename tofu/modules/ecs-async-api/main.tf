@@ -53,7 +53,7 @@ resource "aws_iam_role" "task_role" {
   tags = var.common_tags
 }
 
-# IAM policy for task role (SQS and logs)
+# IAM policy for task role (SQS, Secrets Manager, and logs)
 resource "aws_iam_role_policy" "task_policy" {
   name   = "${var.project_name}-${var.service_name}-task-policy"
   role   = aws_iam_role.task_role.id
@@ -72,6 +72,13 @@ resource "aws_iam_role_policy" "task_policy" {
           aws_sqs_queue.requests.arn,
           aws_sqs_queue.dlq.arn
         ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = values(var.secrets_arns)
       },
       {
         Effect = "Allow"
@@ -96,6 +103,16 @@ resource "aws_cloudwatch_log_group" "service_logs" {
       Name = "${var.project_name}-${var.service_name}-logs"
     }
   )
+}
+
+# Build secrets array for task definition
+locals {
+  additional_secrets = [
+    for secret_name, secret_arn in var.secrets_arns : {
+      name      = upper(replace(secret_name, "-", "_"))
+      valueFrom = secret_arn
+    }
+  ]
 }
 
 # ECS Task Definition for async API service
@@ -140,6 +157,9 @@ resource "aws_ecs_task_definition" "service" {
           value = var.environment
         }
       ]
+
+      # Secrets from Secrets Manager
+      secrets = local.additional_secrets
 
       # Health check
       healthCheck = {

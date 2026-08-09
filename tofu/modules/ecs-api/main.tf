@@ -62,7 +62,10 @@ resource "aws_iam_role_policy" "task_policy" {
         Action = [
           "secretsmanager:GetSecretValue"
         ]
-        Resource = aws_secretsmanager_secret.db_credentials.arn
+        Resource = concat(
+          [aws_secretsmanager_secret.db_credentials.arn],
+          values(var.secrets_arns)
+        )
       },
       {
         Effect = "Allow"
@@ -87,6 +90,29 @@ resource "aws_cloudwatch_log_group" "service_logs" {
       Name = "${var.project_name}-${var.service_name}-logs"
     }
   )
+}
+
+# Build secrets array for task definition
+locals {
+  base_secrets = [
+    {
+      name      = "DB_PASSWORD"
+      valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:password::"
+    },
+    {
+      name      = "DB_USERNAME"
+      valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:username::"
+    }
+  ]
+
+  additional_secrets = [
+    for secret_name, secret_arn in var.secrets_arns : {
+      name      = upper(replace(secret_name, "-", "_"))
+      valueFrom = secret_arn
+    }
+  ]
+
+  all_secrets = concat(local.base_secrets, local.additional_secrets)
 }
 
 # ECS Task Definition for API service
@@ -137,16 +163,7 @@ resource "aws_ecs_task_definition" "service" {
       ]
 
       # Secrets from Secrets Manager
-      secrets = [
-        {
-          name      = "DB_PASSWORD"
-          valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:password::"
-        },
-        {
-          name      = "DB_USERNAME"
-          valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:username::"
-        }
-      ]
+      secrets = local.all_secrets
 
       # CloudWatch logging
       logConfiguration = {

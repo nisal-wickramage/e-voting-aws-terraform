@@ -130,6 +130,12 @@ variable "project_name" {
   }
 }
 
+variable "secrets_arns" {
+  description = "Map of secret names to their ARNs (e.g., {api_key = 'arn:aws:secretsmanager:...'})"
+  type        = map(string)
+  default     = {}
+}
+
 variable "common_tags" {
   description = "Common tags for all resources"
   type        = map(string)
