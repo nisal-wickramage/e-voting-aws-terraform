@@ -141,31 +141,6 @@ Create ECS cluster and Application Load Balancer foundation in private subnets, 
 - Validate Container Insights log group creation
 - Check ALB deletion protection
 
-### LocalStack Testing
-```bash
-# Start LocalStack
-docker run -d -p 4566:4566 \
-  -e SERVICES=ec2,elasticloadbalancing,ecs,cloudwatch \
-  localstack/localstack:4.4.0
-
-# Configure
-export AWS_ENDPOINT_URL="http://localhost:4566"
-export AWS_ACCESS_KEY_ID="test"
-export AWS_SECRET_ACCESS_KEY="test"
-
-# Test
-tofu init
-tofu plan -var="private_subnet_ids=[\"subnet-1\",\"subnet-2\"]"
-tofu apply -auto-approve
-
-# Validate
-aws --endpoint-url=http://localhost:4566 ecs describe-clusters
-aws --endpoint-url=http://localhost:4566 elbv2 describe-load-balancers
-aws --endpoint-url=http://localhost:4566 elbv2 describe-target-groups
-
-# Destroy
-tofu destroy -auto-approve
-```
 
 ## Dependencies
 - `network` module: VPC ID, private subnet IDs

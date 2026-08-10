@@ -143,31 +143,6 @@ Enable automated backups, snapshots, and cross-region replication for RDS and S3
 - Test replication failover: Simulate primary region failure
 - Validate alarm: Manually trigger backup failure
 
-### LocalStack Testing
-```bash
-# Start LocalStack
-docker run -d -p 4566:4566 \
-  -e SERVICES=rds,s3,backup,cloudwatch \
-  localstack/localstack:4.4.0
-
-# Configure
-export AWS_ENDPOINT_URL="http://localhost:4566"
-export AWS_ACCESS_KEY_ID="test"
-export AWS_SECRET_ACCESS_KEY="test"
-
-# Test
-tofu init
-tofu plan
-tofu apply -auto-approve
-
-# Validate
-aws --endpoint-url=http://localhost:4566 rds describe-db-instances
-aws --endpoint-url=http://localhost:4566 backup list-backup-vaults
-aws --endpoint-url=http://localhost:4566 s3api get-bucket-versioning
-
-# Destroy
-tofu destroy -auto-approve
-```
 
 ## Dependencies
 - `database` module: RDS instance ID

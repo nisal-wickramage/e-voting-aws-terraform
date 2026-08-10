@@ -139,34 +139,6 @@ Create a private S3 bucket for static frontend assets (SPA) with versioning, enc
 - Test bucket policy: Verify only OAI can access (with test credentials)
 - Test lifecycle: Verify transitions occur on schedule
 
-### LocalStack Testing
-```bash
-# Start LocalStack
-docker run -d -p 4566:4566 -e SERVICES=s3 localstack/localstack:4.4.0
-
-# Configure
-export AWS_ENDPOINT_URL="http://localhost:4566"
-export AWS_ACCESS_KEY_ID="test"
-export AWS_SECRET_ACCESS_KEY="test"
-
-# Test
-tofu init
-tofu plan
-tofu apply -auto-approve
-
-# Validate
-aws --endpoint-url=http://localhost:4566 s3 ls
-aws --endpoint-url=http://localhost:4566 s3 versioning ls s3://e-voting-frontend-dev
-aws --endpoint-url=http://localhost:4566 s3api get-bucket-encryption \
-  --bucket e-voting-frontend-dev
-
-# Test bucket policy
-aws --endpoint-url=http://localhost:4566 s3api get-bucket-policy \
-  --bucket e-voting-frontend-dev
-
-# Destroy
-tofu destroy -auto-approve
-```
 
 ## Dependencies
 - `network` module: Used for cross-stack reference only (no hard dependency)

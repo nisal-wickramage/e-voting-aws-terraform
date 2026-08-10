@@ -159,35 +159,6 @@ Create a private-only VPC with multi-AZ tier-based subnets (web, app, db), VPC e
 - Confirm S3/DynamoDB prefix list routes added to correct route tables
 - Test subnet spanning across both AZs (us-east-1a, us-east-1b)
 
-### LocalStack Testing
-```bash
-# Start LocalStack
-docker run -d -p 4566:4566 -e SERVICES=ec2 localstack/localstack:4.4.0
-
-# Configure
-export AWS_ENDPOINT_URL="http://localhost:4566"
-export AWS_ACCESS_KEY_ID="test"
-export AWS_SECRET_ACCESS_KEY="test"
-
-# Test
-tofu init
-tofu plan
-tofu apply -auto-approve
-
-# Validate
-aws --endpoint-url=http://localhost:4566 ec2 describe-vpcs
-aws --endpoint-url=http://localhost:4566 ec2 describe-subnets
-aws --endpoint-url=http://localhost:4566 ec2 describe-network-acls
-aws --endpoint-url=http://localhost:4566 ec2 describe-vpc-endpoints
-aws --endpoint-url=http://localhost:4566 ec2 describe-route-tables
-
-# Test NACL rules (web cannot reach db)
-aws --endpoint-url=http://localhost:4566 ec2 describe-network-acl-entries \
-  --network-acl-id acl-12345
-
-# Destroy
-tofu destroy -auto-approve
-```
 
 ## Dependencies
 - None (foundation module)

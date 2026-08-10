@@ -169,30 +169,6 @@ Deploy CloudFront distributions for frontend and API with VPC origin support, We
 - Validate SSL/TLS: Check certificate validity
 - Test WAF: Send SQL injection payload, verify WAF blocks (403)
 
-### LocalStack Testing
-```bash
-# Start LocalStack
-docker run -d -p 4566:4566 \
-  -e SERVICES=cloudfront,wafv2,s3,elasticloadbalancing \
-  localstack/localstack:4.4.0
-
-# Configure
-export AWS_ENDPOINT_URL="http://localhost:4566"
-export AWS_ACCESS_KEY_ID="test"
-export AWS_SECRET_ACCESS_KEY="test"
-
-# Test
-tofu init
-tofu plan -var="alb_dns_name=internal-alb-1234.us-east-1.elb.amazonaws.com"
-tofu apply -auto-approve
-
-# Validate
-aws --endpoint-url=http://localhost:4566 cloudfront list-distributions
-aws --endpoint-url=http://localhost:4566 wafv2 list-web-acls --scope CLOUDFRONT
-
-# Destroy
-tofu destroy -auto-approve
-```
 
 ## Dependencies
 - `platform` module: ALB DNS name, ALB zone ID

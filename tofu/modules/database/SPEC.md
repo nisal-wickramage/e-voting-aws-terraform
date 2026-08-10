@@ -127,29 +127,6 @@ Create a production-grade RDS PostgreSQL Multi-AZ cluster with automated backups
 - Validate parameter group: SSL required
 - Check subnet group spans correct AZs
 
-### LocalStack Testing
-```bash
-# Start LocalStack
-docker run -d -p 4566:4566 -e SERVICES=rds,ec2 localstack/localstack:4.4.0
-
-# Configure
-export AWS_ENDPOINT_URL="http://localhost:4566"
-export AWS_ACCESS_KEY_ID="test"
-export AWS_SECRET_ACCESS_KEY="test"
-
-# Test
-tofu init
-tofu plan -var="ecs_security_group_id=sg-12345" \
-          -var="private_subnet_ids=[\"subnet-1\",\"subnet-2\"]"
-tofu apply -auto-approve
-
-# Validate
-aws --endpoint-url=http://localhost:4566 rds describe-db-instances
-aws --endpoint-url=http://localhost:4566 rds describe-db-security-groups
-
-# Destroy
-tofu destroy -auto-approve
-```
 
 ## Dependencies
 - `network` module: VPC ID, private subnet IDs
