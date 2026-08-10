@@ -1,0 +1,279 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    TERRAGRUNT STACKS - COMPOSITION EXAMPLES                  ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+🎯 THREE PRODUCTION-READY STACKS
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1️⃣  BASIC API STACK (stacks/basic-api/)                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Purpose: Deploy a simple REST API with database backend                     │
+│ Modules: 8 units / 1 service                                                │
+│ Deploy time: ~15-20 minutes                                                 │
+│ Monthly cost: ~$80 (dev environment)                                        │
+│                                                                              │
+│ Components:                                                                  │
+│   ✓ Network (VPC, subnets, security groups)                                 │
+│   ✓ ECS Cluster with ALB                                                    │
+│   ✓ RDS PostgreSQL Multi-AZ                                                 │
+│   ✓ Single API Service                                                      │
+│   ✓ Database Migrations Task                                                │
+│   ✓ CloudFront + WAF                                                        │
+│   ✓ SNS Notifications                                                       │
+│   ✓ CloudWatch Alarms                                                       │
+│                                                                              │
+│ Use Cases:                                                                   │
+│   • REST API for mobile apps                                                │
+│   • Microservice API (internal)                                             │
+│   • GraphQL server                                                          │
+│   • Webhook receiver                                                        │
+│                                                                              │
+│ Deploy:                                                                      │
+│   cd stacks/basic-api                                                       │
+│   terragrunt stack generate                                                 │
+│   terragrunt stack run -- init                                              │
+│   terragrunt stack run -- plan                                              │
+│   terragrunt stack run -- apply                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 2️⃣  WEB APP STACK (stacks/web-app/)                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Purpose: Deploy a full-stack web application (frontend + backend)           │
+│ Modules: 9 units / 1 service + frontend                                     │
+│ Deploy time: ~20-25 minutes                                                 │
+│ Monthly cost: ~$90 (dev environment)                                        │
+│                                                                              │
+│ Components:                                                                  │
+│   ✓ All from Basic API                                                      │
+│   ✓ S3 Static Website                                                       │
+│   ✓ Dual-origin CloudFront (API + Frontend)                                 │
+│   ✓ Path-based routing (/api/* vs /*)                                       │
+│                                                                              │
+│ Use Cases:                                                                   │
+│   • Full-stack web application                                              │
+│   • React/Vue/Angular + API                                                 │
+│   • Single-page app (SPA) backend                                           │
+│   • Progressive web app (PWA)                                               │
+│                                                                              │
+│ Deploy:                                                                      │
+│   cd stacks/web-app                                                         │
+│   terragrunt stack generate                                                 │
+│   terragrunt stack run -- init                                              │
+│   terragrunt stack run -- plan                                              │
+│   terragrunt stack run -- apply                                             │
+│                                                                              │
+│ Then upload frontend:                                                        │
+│   aws s3 sync ./frontend/dist s3://bucket-name/                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 3️⃣  MULTI-SERVICE API STACK (stacks/multi-service-api/)                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Purpose: Deploy microservices with sync/async processing                    │
+│ Modules: 12 units / 2 services + queue                                      │
+│ Deploy time: ~25-30 minutes                                                 │
+│ Monthly cost: ~$91 (dev environment)                                        │
+│                                                                              │
+│ Components:                                                                  │
+│   ✓ Network + Cluster + Database                                            │
+│   ✓ API Service (synchronous)                                               │
+│   ✓ Worker Service (asynchronous)                                           │
+│   ✓ SQS Queue with Dead-Letter Queue                                        │
+│   ✓ Database Migrations                                                     │
+│   ✓ Per-service monitoring                                                  │
+│   ✓ CloudFront + WAF                                                        │
+│                                                                              │
+│ Use Cases:                                                                   │
+│   • Image processing platform                                               │
+│   • Report generation service                                               │
+│   • Data validation pipeline                                                │
+│   • Job queue system                                                        │
+│   • Event processing architecture                                           │
+│                                                                              │
+│ Deploy:                                                                      │
+│   cd stacks/multi-service-api                                               │
+│   terragrunt stack generate                                                 │
+│   terragrunt stack run -- init                                              │
+│   terragrunt stack run -- plan                                              │
+│   terragrunt stack run -- apply                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                          QUICK COMPARISON TABLE                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Feature                  │ Basic API │ Web App │ Multi-Service
+─────────────────────────┼───────────┼─────────┼──────────────
+Frontend (S3)            │     ❌    │   ✅    │      ❌
+API Service              │     ✅    │   ✅    │      ✅
+Worker Service           │     ❌    │   ❌    │      ✅
+SQS Queue                │     ❌    │   ❌    │      ✅
+Database (RDS)           │     ✅    │   ✅    │      ✅
+CloudFront CDN           │     ✅    │   ✅    │      ✅
+WAF Protection           │     ✅    │   ✅    │      ✅
+Monitoring/Alarms        │     ✅    │   ✅    │      ✅
+─────────────────────────┼───────────┼─────────┼──────────────
+Total Modules            │     8     │    9    │      12
+Deploy Time (minutes)    │   15-20   │  20-25  │     25-30
+Monthly Cost (dev)       │   ~$80    │  ~$90   │     ~$91
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         ARCHITECTURE DIAGRAMS                                ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+BASIC API STACK:
+────────────────
+                    Internet
+                       │
+              CloudFront + WAF
+                       │
+                  Private ALB
+                       │
+                  ECS API Service ◄──────────────┐
+                       │                         │
+                  RDS PostgreSQL ◄─ Migrations ──┘
+
+WEB APP STACK:
+──────────────
+                    Internet
+                       │
+              CloudFront + WAF
+                   /    │    \
+              /api/*     │     /*
+               │         │      │
+           ALB │         │      S3
+               │         │    Frontend
+          ECS API Service
+               │
+          RDS PostgreSQL
+
+
+MULTI-SERVICE API STACK:
+────────────────────────
+                    Internet
+                       │
+              CloudFront + WAF
+                       │
+                  Private ALB
+                       │
+        ┌──────────────┼──────────────┐
+        │              │              │
+    ECS API        Migrations     (reserved)
+        │
+        └──► Enqueue Job ──► SQS Queue
+                              │
+                              ├──► Worker Service ──┐
+                              │                     │
+                          DLQ │                     │
+                              └─ Failed Jobs    RDS ┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                        GETTING STARTED (QUICK START)                         ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+1. CHOOSE YOUR STACK
+   ✓ Just API? Use: basic-api
+   ✓ Web app? Use: web-app
+   ✓ Microservices? Use: multi-service-api
+
+2. GENERATE THE STACK
+   cd stacks/basic-api
+   terragrunt stack generate
+
+3. INITIALIZE
+   terragrunt stack run -- init
+   ⏱ Wait ~2 minutes for provider setup
+
+4. PLAN
+   terragrunt stack run -- plan
+   📋 Review all resources to be created
+
+5. DEPLOY
+   terragrunt stack run -- apply
+   ⏱ Wait ~5 minutes for infrastructure
+
+6. VERIFY
+   terragrunt stack output
+   curl https://$(output cloudfront_domain_name)/api/health
+
+7. CLEANUP (optional)
+   terragrunt stack run -- destroy
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                            DOCUMENTATION                                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Main Stacks README:
+   stacks/README.md - Overview and comparison of all stacks
+
+Stack-Specific Documentation:
+   stacks/basic-api/README.md - Basic API detailed guide
+   stacks/web-app/README.md - Web app detailed guide
+   stacks/multi-service-api/README.md - Microservices detailed guide
+
+Comprehensive Guide:
+   STACKS_GUIDE.md - Complete examples and troubleshooting
+
+Module Documentation:
+   tofu/modules/*/README.md - Individual module docs
+
+Module Consolidation:
+   MIGRATION_ECS_COMPOSABLE.md - How modules were unified
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         ADVANCED FEATURES                                   ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+PARALLEL EXECUTION
+   Terragrunt automatically deploys independent units in parallel
+   Example: network and notification run simultaneously
+
+DEPENDENCY ORDERING
+   Each stack respects module dependencies:
+     network → cluster, database
+     cluster + database → ecs services
+     services → alarms
+
+PARTIAL DEPLOYMENT
+   Deploy just one unit:
+     cd stacks/basic-api
+     terragrunt stack generate
+     terragrunt -chdir=.stack/network apply
+
+CUSTOM STACKS
+   Create your own by combining units:
+     mkdir stacks/my-stack
+     Create terragrunt.stack.hcl with your units
+     Deploy like any other stack
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                              NEXT STEPS                                      ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Ready to deploy?
+
+1. Start with Basic API:
+   cd stacks/basic-api && terragrunt stack run -- apply
+
+2. Test your API:
+   curl https://your-cloudfront-domain.cloudfront.net/api/health
+
+3. Scale to Web App:
+   cd stacks/web-app && terragrunt stack run -- apply
+   Upload your frontend: aws s3 sync ./frontend/dist s3://bucket/
+
+4. Add Microservices:
+   cd stacks/multi-service-api && terragrunt stack run -- apply
+   Deploy worker services alongside your main API
+
+5. Customize:
+   Modify terragrunt/dev/* to suit your needs
+   Create additional stacks as needed
+
+
+Questions? See STACKS_GUIDE.md for detailed examples!
