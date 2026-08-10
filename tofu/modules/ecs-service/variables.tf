@@ -1,4 +1,6 @@
-# ECS Async API Service Module Variables
+# ============================================================
+# Cluster & Service Configuration
+# ============================================================
 
 variable "cluster_name" {
   description = "ECS cluster name"
@@ -19,16 +21,18 @@ variable "cluster_arn" {
 }
 
 variable "service_name" {
-  description = "ECS service name (e.g., async-api)"
+  description = "ECS service name (e.g., api, async-api, worker)"
   type        = string
-  default     = "async-api"
   validation {
     condition     = length(var.service_name) > 0 && length(var.service_name) <= 255
     error_message = "Service name must be 1-255 characters."
   }
 }
 
+# ============================================================
 # ECR Configuration
+# ============================================================
+
 variable "enable_ecr" {
   description = "Create ECR repository for this service"
   type        = bool
@@ -61,8 +65,12 @@ variable "ecr_retention_days" {
   }
 }
 
+# ============================================================
+# Container Configuration
+# ============================================================
+
 variable "container_image" {
-  description = "Container image URI for async API service"
+  description = "Container image URI for service"
   type        = string
   validation {
     condition     = length(var.container_image) > 0
@@ -71,7 +79,7 @@ variable "container_image" {
 }
 
 variable "container_port" {
-  description = "Container port for health checks"
+  description = "Container port for service"
   type        = number
   default     = 8000
   validation {
@@ -100,6 +108,10 @@ variable "container_cpu" {
   }
 }
 
+# ============================================================
+# Deployment Configuration
+# ============================================================
+
 variable "desired_count" {
   description = "Desired number of running tasks"
   type        = number
@@ -111,25 +123,31 @@ variable "desired_count" {
 }
 
 variable "ecs_security_group_ids" {
-  description = "Security group IDs for service tasks"
+  description = "Security groups for ECS tasks"
   type        = list(string)
   validation {
     condition     = length(var.ecs_security_group_ids) > 0
-    error_message = "Must provide at least one security group."
+    error_message = "At least one security group must be provided."
   }
 }
 
+variable "extra_security_group_ids" {
+  description = "Additional security groups to attach to ECS tasks"
+  type        = list(string)
+  default     = []
+}
+
 variable "ecs_subnet_ids" {
-  description = "Subnet IDs for service tasks"
+  description = "Subnets for ECS tasks"
   type        = list(string)
   validation {
     condition     = length(var.ecs_subnet_ids) > 0
-    error_message = "Must provide at least one subnet."
+    error_message = "At least one subnet must be provided."
   }
 }
 
 variable "ecs_task_execution_role_arn" {
-  description = "IAM role ARN for ECS task execution"
+  description = "ECS task execution role ARN"
   type        = string
   validation {
     condition     = can(regex("arn:aws:iam:", var.ecs_task_execution_role_arn))
@@ -137,47 +155,56 @@ variable "ecs_task_execution_role_arn" {
   }
 }
 
+# ============================================================
+# ALB Configuration (Optional)
+# ============================================================
+
 variable "alb_target_group_arn" {
-  description = "ALB target group ARN for service registration"
+  description = "ALB target group ARN for service registration (optional)"
   type        = string
+  default     = ""
   validation {
-    condition     = can(regex("arn:aws:elasticloadbalancing:", var.alb_target_group_arn))
-    error_message = "Must be a valid ALB target group ARN."
+    condition     = var.alb_target_group_arn == "" || can(regex("arn:aws:elasticloadbalancing:", var.alb_target_group_arn))
+    error_message = "Must be a valid ALB target group ARN or empty."
   }
 }
 
-variable "sqs_queue_name" {
-  description = "SQS queue name for async requests"
+variable "alb_listener_arn" {
+  description = "ALB listener ARN for rule creation (optional)"
   type        = string
-  default     = "async-api-requests"
+  default     = ""
   validation {
-    condition     = length(var.sqs_queue_name) > 0 && length(var.sqs_queue_name) <= 80
-    error_message = "Queue name must be 1-80 characters."
+    condition     = var.alb_listener_arn == "" || can(regex("arn:aws:elasticloadbalancing:", var.alb_listener_arn))
+    error_message = "Must be a valid ALB listener ARN or empty."
   }
 }
 
-variable "sqs_visibility_timeout" {
-  description = "SQS message visibility timeout in seconds"
-  type        = number
-  default     = 300
+variable "listener_rule_path_pattern" {
+  description = "ALB listener rule path pattern (e.g., /api/*)"
+  type        = list(string)
+  default     = []
   validation {
-    condition     = var.sqs_visibility_timeout >= 0 && var.sqs_visibility_timeout <= 43200
-    error_message = "Visibility timeout must be 0-43200 seconds."
+    condition     = length(var.listener_rule_path_pattern) == 0 || length(var.listener_rule_path_pattern) > 0
+    error_message = "Path pattern list must be empty or contain values."
   }
 }
 
-variable "sqs_message_retention" {
-  description = "SQS message retention period in seconds (default 4 days)"
+variable "listener_rule_priority" {
+  description = "Priority for ALB listener rule (1-50000)"
   type        = number
-  default     = 345600
+  default     = 100
   validation {
-    condition     = var.sqs_message_retention >= 60 && var.sqs_message_retention <= 1209600
-    error_message = "Message retention must be 60-1209600 seconds."
+    condition     = var.listener_rule_priority >= 1 && var.listener_rule_priority <= 50000
+    error_message = "Priority must be between 1 and 50000."
   }
 }
+
+# ============================================================
+# Environment & Configuration
+# ============================================================
 
 variable "environment" {
-  description = "Environment (dev, staging, prod)"
+  description = "Environment name (dev/staging/prod)"
   type        = string
   validation {
     condition     = contains(["dev", "staging", "prod"], var.environment)
@@ -194,10 +221,30 @@ variable "project_name" {
   }
 }
 
+# ============================================================
+# Environment Variables & Secrets
+# ============================================================
+
+variable "environment_variables" {
+  description = "Environment variables for container (map of key=value)"
+  type        = map(string)
+  default     = {}
+}
+
 variable "secrets_arns" {
   description = "Map of secret names to their ARNs (e.g., {api_key = 'arn:aws:secretsmanager:...'})"
   type        = map(string)
   default     = {}
+}
+
+# ============================================================
+# IAM & Security
+# ============================================================
+
+variable "extra_iam_policy_statements" {
+  description = "Additional IAM policy statements for task role (as list of policy statement objects)"
+  type        = list(any)
+  default     = []
 }
 
 variable "common_tags" {

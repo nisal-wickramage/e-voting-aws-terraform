@@ -31,7 +31,6 @@ resource "aws_secretsmanager_secret_version" "integration" {
 resource "aws_secretsmanager_secret_rotation" "integration" {
   count             = var.enable_rotation ? 1 : 0
   secret_id         = aws_secretsmanager_secret.integration.id
-  rotation_enabled  = true
 
   rotation_rules {
     automatically_after_days = var.rotation_days
