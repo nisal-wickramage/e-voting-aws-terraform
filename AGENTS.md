@@ -2,9 +2,9 @@
 
 ## Project Overview
 
-**Purpose**: Deploy a highly available, scalable microservices architecture on AWS with minimal blast radius and progressive module development.
+**Purpose**: Deploy a highly available, scalable microservices architecture on AWS with a single `tofu apply` command.
 
-**Tech Stack**: OpenTofu + Terragrunt orchestration, ECS Fargate compute, RDS PostgreSQL, CloudFront + WAF for public exposure
+**Tech Stack**: OpenTofu, ECS Fargate compute, RDS PostgreSQL, CloudFront + WAF for public exposure
 
 **Key Architecture Decision**: Private-only subnets (no IGW in data plane). All traffic flows through CloudFront (frontend/API) or NAT gateways (egress).
 
@@ -18,7 +18,7 @@ See AWS docs: [VPC origins](https://docs.aws.amazon.com/AmazonCloudFront/latest/
 
 ## Module Structure & Dependency Graph
 
-Modules are designed for independent deployment and testing. Deploy in this order:
+All modules are deployed together in dependency order via a single root `main.tf`:
 
 ```
 1. network                    (No dependencies)
@@ -31,36 +31,32 @@ Modules are designed for independent deployment and testing. Deploy in this orde
    ├─ RDS PostgreSQL cluster (Multi-AZ)
    └─ Security group allowing ECS ingress
 
-3. platform                   (Depends: network)
+3. cluster                    (Depends: network)
    ├─ ECS cluster (Fargate)
    ├─ ALB in private subnets
    └─ Security groups (ALB ← CloudFront, ECS ← ALB)
 
-4. ecs-services               (Depends: platform, database)
-   ├─ Task definitions + ECR repos (per service)
-   ├─ ECS services
+4. ecs-api                    (Depends: cluster, database)
+   ├─ Task definition for API service
+   ├─ ECS service
    └─ ALB listener rules & target groups
 
 5. s3-frontend                (Depends: network)
    ├─ S3 bucket (private, versioning)
    └─ Bucket policy (CloudFront-only access)
 
-6. cdn-waf                    (Depends: platform, s3-frontend)
+6. cdn-waf                    (Depends: cluster, s3-frontend)
    ├─ WAF rules (rate limiting, geo-blocking, etc.)
    ├─ CloudFront distribution (VPC origin → ALB)
    └─ CloudFront distribution (S3 origin → frontend)
 
-7. monitoring                 (Depends: platform, database)
-   ├─ CloudWatch alarms (ECS, RDS, ALB)
-   └─ Dashboards
-
-8. disaster-recovery          (Depends: database, s3-frontend)
+7. disaster-recovery          (Depends: database, s3-frontend)
    ├─ RDS automated backups + snapshots
    ├─ S3 versioning + cross-region replication
    └─ Recovery procedures/runbooks
 ```
 
-## OpenTofu + Terragrunt Conventions
+## OpenTofu Project Structure
 
 ### Module Locations
 ```
@@ -74,56 +70,51 @@ tofu/
 │   │   ├── subnets.tf
 │   │   ├── vpc_endpoints.tf
 │   │   └── README.md
-│   └── [other modules follow same pattern]
-│
-└── global/
-    ├── variables.tf
-    ├── locals.tf
-    └── outputs.tf
+│   ├── cluster/
+│   ├── database/
+│   ├── ecs-api/
+│   ├── s3-frontend/
+│   ├── cdn-waf/
+│   └── disaster-recovery/
 ```
 
-### Terragrunt Layout
+### Root Configuration
 ```
-terragrunt/
-├── terragrunt.hcl                    # Root config (common settings, path helpers)
-├── dev/
-│   ├── terragrunt.hcl
-│   ├── network/terragrunt.hcl
-│   ├── database/terragrunt.hcl
-│   └── [other services]
-├── staging/
-│   └── [same structure]
-└── prod/
-    └── [same structure]
+e-voting-aws-terraform/
+├── main.tf                   # Module orchestration (7 modules)
+├── variables.tf              # Input variables for all modules
+├── outputs.tf                # Aggregated outputs
+├── locals.tf                 # Common values (tags, etc.)
+├── terraform.tf              # Provider & backend config
+└── tofu/modules/             # Reusable modules
 ```
 
 ### Key Patterns
 
-**Remote State**: Each module's state stored in S3 with DynamoDB locking (configured in root `terragrunt.hcl`)
+**Remote State**: S3 backend with DynamoDB locking (configured in `terraform.tf`)
 
-**Input Variables**: Module `variables.tf` defines inputs; Terragrunt `terragrunt.hcl` provides values via `inputs {}` block
+**Input Variables**: Global variables in root `variables.tf` passed to all modules
 
-**Dependencies**: Use `dependency` blocks in Terragrunt to reference outputs from other modules:
+**Dependencies**: Module dependencies defined in root `main.tf` with explicit `depends_on` blocks:
 ```hcl
-dependency "network" {
-  config_path = "../network"
-  mock_outputs = { vpc_id = "vpc-fake" }
-}
-
-inputs = {
-  vpc_id = dependency.network.outputs.vpc_id
+module "database" {
+  source = "./tofu/modules/database"
+  
+  vpc_id             = module.network.vpc_id
+  private_subnet_ids = module.network.private_subnet_ids_by_tier["db"]
+  
+  depends_on = [module.network]
 }
 ```
 
-**Locals**: Reusable values in `terragrunt.hcl`:
+**Locals**: Common values in `locals.tf`:
 ```hcl
 locals {
-  environment = "dev"
-  region      = "us-east-1"
-  tags = {
-    Environment = local.environment
-    Project     = "e-voting"
-    ManagedBy   = "terragrunt"
+  common_tags = {
+    Environment = var.environment
+    Project     = var.project_name
+    ManagedBy   = "Terraform"
+    CreatedAt   = timestamp()
   }
 }
 ```
@@ -133,122 +124,41 @@ locals {
 ### 1. Define Module Spec
 Create `SPEC.md` in module directory with the following structure:
 - **Purpose**: 1-2 line summary
-- **Implementation Steps**: Numbered, granular steps for building the module (see examples below)
+- **Implementation Steps**: Numbered, granular steps for building the module
 - **Inputs**: Variable names, types, descriptions
 - **Outputs**: Output names, descriptions
 - **Resources**: List of AWS resources created
 - **Security**: Security group rules, IAM policies
 - **Testing**: Expected behavior, edge cases
 
-### 2. Implementation Steps Pattern
-Each module SPEC.md should include detailed implementation steps. Example for **Network Module**:
-
-```
-## Implementation Steps
-
-1. **Create VPC**
-   - Resource: aws_vpc
-   - Inputs: vpc_cidr, enable_dns_hostnames, enable_dns_support
-   - Output: vpc_id
-   - File: main.tf
-
-2. **Create VPC Endpoints Security Group**
-   - Resource: aws_security_group
-   - Rules: Inbound HTTPS (443) from VPC CIDR
-   - Output: vpc_endpoint_sg_id
-   - File: main.tf
-
-3. **Create Tier-based Subnets**
-   - Resources: aws_subnet (6 total: 2 web, 2 app, 2 db)
-   - Logic: for_each over subnets_by_tier local
-   - Inputs: availability_zones, private_subnet_cidrs
-   - Output: private_subnet_ids_by_tier
-   - File: subnets.tf
-
-4. **Create Tier-specific Route Tables**
-   - Resources: aws_route_table (3 total: web, app, db)
-   - Logic: One per tier with VPC CIDR local route
-   - Output: private_route_table_ids_by_tier
-   - File: route_tables.tf
-
-5. **Associate Subnets to Route Tables**
-   - Resources: aws_route_table_association (6 total)
-   - Logic: for_each web/app/db subnets
-   - Dependencies: Subnets (step 3), Route tables (step 4)
-   - File: route_tables.tf
-
-6. **Create Tier-specific Network ACLs**
-   - Resources: aws_network_acl (3 total)
-   - Logic: Inline subnet_ids association
-   - Output: nacl_ids_by_tier
-   - File: nacls.tf
-
-7. **Define NACL Rules**
-   - Resources: aws_network_acl_rule (multiple)
-   - Logic: for_each over tier CIDR blocks for dynamic rules
-   - Rules per tier:
-     - Web: inbound from app (1024-65535), outbound to app (8080-65535), HTTPS, DNS
-     - App: inbound from web (1024-65535), outbound to db (5432), HTTPS, DNS
-     - Db: inbound from app (5432), outbound HTTPS, DNS
-   - File: nacls.tf
-
-8. **Create VPC Endpoints**
-   - Resources: aws_vpc_endpoint (gateway + interface)
-   - Logic: Separate gateway (s3, dynamodb) from interface endpoints via locals
-   - Placement: App tier subnets only
-   - Output: vpc_endpoint_ids
-   - File: vpc_endpoints.tf
-
-9. **Optional: VPC Flow Logs**
-   - Resources: aws_flow_log, aws_cloudwatch_log_group, aws_iam_role, aws_iam_role_policy
-   - Condition: if var.enable_flow_logs == true
-   - File: main.tf
-```
-
-### 3. Implement Module
+### 2. Implement Module
 - Start with `variables.tf` (define all inputs with validation)
-- Follow implementation steps in order (each step is typically one file or logical grouping)
+- Follow implementation steps in order
 - Implement resources in domain-specific files (main.tf, subnets.tf, nacls.tf, etc.)
 - Define `outputs.tf` (must match spec outputs)
 - Add comments for each step's purpose
 - Use consistent naming: `aws_<resource>_<descriptor>` (e.g., `aws_security_group_vpc_endpoints`)
 
-### 4. Test with LocalStack
+### 3. Add Module to Root main.tf
+Once a module is complete:
+1. Add module block in `main.tf` with proper dependency ordering
+2. Pass required variables from `variables.tf`
+3. Reference outputs from dependent modules using `module.<name>.output.<value>`
+4. Run `tofu plan` to validate the integration
+5. Test with `tofu apply` in dev environment
 
-**Prerequisites**: Docker running, LocalStack v4.4.0 installed
+### 4. Testing Strategy
 
-**Test Steps**:
-```bash
-# 1. Start LocalStack
-docker run -d -p 4566:4566 \
-  -e SERVICES=ec2,rds,s3,elasticloadbalancing,ecs,cloudwatch \
-  localstack/localstack:4.4.0
+**Unit Tests (Module-level)**
+- Test individual module in isolation
+- Verify outputs are populated correctly
+- Check security group rules and IAM policies
 
-# 2. Configure OpenTofu to use LocalStack
-export AWS_ENDPOINT_URL="http://localhost:4566"
-export AWS_ACCESS_KEY_ID="test"
-export AWS_SECRET_ACCESS_KEY="test"
-export AWS_REGION="us-east-1"
-
-# 3. Initialize and test module
-tofu init
-tofu plan
-tofu apply -auto-approve
-
-# 4. Validate resources
-aws --endpoint-url=http://localhost:4566 ec2 describe-vpcs
-aws --endpoint-url=http://localhost:4566 rds describe-db-instances
-
-# 5. Destroy and cleanup
-tofu destroy -auto-approve
-docker stop $(docker ps -q --filter "ancestor=localstack/localstack:4.4.0")
-```
-
-### 4. Integrate into Terragrunt
-- Create environment-specific `terragrunt.hcl`
-- Use `dependency` blocks for cross-module references
-- Run `terragrunt run-all plan` to validate entire environment
-- Test in dev first, then staging, then prod
+**Integration Tests (Full Stack)**
+- Deploy entire infrastructure with `tofu apply`
+- Verify cross-module connectivity (RDS reachable from ECS, etc.)
+- Test failover behavior for Multi-AZ resources
+- Run smoke tests against deployed services
 
 ## Development Conventions
 
@@ -260,14 +170,16 @@ docker stop $(docker ps -q --filter "ancestor=localstack/localstack:4.4.0")
 
 ### Tagging
 All resources tagged with:
+```hcl
+tags = merge(
+  var.common_tags,
+  {
+    Name = "${var.project_name}-${var.environment}-${local.component_name}"
+  }
+)
 ```
-{
-  Environment = var.environment
-  Project     = "e-voting"
-  Module      = var.module_name
-  ManagedBy   = "terraform"
-}
-```
+
+Common tags applied globally via provider default_tags in `terraform.tf`.
 
 ### Outputs
 Always provide:
@@ -279,24 +191,45 @@ Always provide:
 - Add `README.md` to each module explaining purpose, inputs, outputs
 - Use comments for complex logic (e.g., conditional resource creation)
 - Document security group rules: why each ingress/egress rule exists
+- Keep SPEC.md updated with implementation details
 
-## Testing Strategy
+## Deployment Workflow
 
-### Unit Tests (LocalStack)
-- **Scope**: Individual module in isolation
-- **Tool**: LocalStack v4.4.0
-- **Frequency**: Before committing module code
-- **Validation**: Resource count, security group rules, outputs populated
+### Development Environment
 
-### Integration Tests (Staging)
-- **Scope**: Module + dependencies (e.g., ECS + RDS + network)
-- **Frequency**: Before PR merge
-- **Validation**: Cross-module connectivity (RDS reachable from ECS)
+1. **Configure Backend**:
+   ```bash
+   aws s3 mb s3://evoting-terraform-state-dev
+   aws dynamodb create-table \
+     --table-name terraform-locks \
+     --attribute-definitions AttributeName=LockID,AttributeType=S \
+     --key-schema AttributeName=LockID,KeyType=HASH \
+     --billing-mode PAY_PER_REQUEST
+   ```
 
-### Infrastructure Tests (prod-like)
-- **Scope**: Full environment deployment
-- **Frequency**: Weekly or before release
-- **Validation**: Health checks, latency, failover behavior
+2. **Initialize**:
+   ```bash
+   tofu init \
+     -backend-config="bucket=evoting-terraform-state-dev" \
+     -backend-config="key=dev.tfstate" \
+     -backend-config="region=us-east-1" \
+     -backend-config="dynamodb_table=terraform-locks"
+   ```
+
+3. **Plan & Apply**:
+   ```bash
+   tofu plan -out=tfplan
+   tofu apply tfplan
+   ```
+
+4. **Verify**:
+   ```bash
+   tofu output infrastructure_summary
+   ```
+
+### Staging/Production
+
+Repeat steps above for staging/prod environments, using different state buckets and tfvars files.
 
 ## Common Pitfalls & Solutions
 
@@ -305,35 +238,55 @@ Always provide:
 | **State Lock Timeout** | DynamoDB throttling or stale lock | Increase DynamoDB capacity; use `force-unlock` sparingly |
 | **NAT Gateway Cost Overruns** | Hourly charges + data transfer | Monitor with CloudWatch; use VPC endpoints for AWS services |
 | **ECS Task Failures** | Missing VPC endpoint or IAM role | Pre-validate VPC endpoints; use task role for Secrets Manager |
-| **Blast Radius Expansion** | Module outputs used outside dependency chain | Enforce `dependency` blocks; review `terraform show` before apply |
-| **LocalStack Divergence** | AWS behavior not fully simulated | Focus on infrastructure shape, not AWS-specific features; always validate in staging |
+| **Module Output Not Found** | Typo in module reference | Verify module name and output name in `main.tf` |
 | **RDS Multi-AZ Failures** | Subnets span only 1 AZ | Verify DB subnet group covers ≥2 AZs; test failover |
+| **CloudFront Can't Reach ALB** | ALB security group too restrictive | Verify ALB allows ingress from CloudFront security group |
 
 ## Environment-Specific Behavior
 
 ### Dev
 - Smaller instance types (cost optimization)
-- Single-AZ deployments (RDS single-AZ OK for dev)
+- Single-AZ deployments acceptable (RDS single-AZ OK for dev)
 - Minimal monitoring (CloudWatch alarms only on critical resources)
+- Example tfvars:
+  ```hcl
+  environment = "dev"
+  db_instance_class = "db.t3.micro"
+  desired_count = 1
+  ```
 
 ### Staging
 - Production-like sizes (validate performance)
 - Multi-AZ deployments
 - Full monitoring suite
+- Example tfvars:
+  ```hcl
+  environment = "staging"
+  db_instance_class = "db.t3.small"
+  desired_count = 2
+  ```
 
 ### Prod
 - Rightsized instances (validated by staging)
 - Multi-AZ mandatory (all stateful services)
-- Enhanced monitoring (detailed CloudWatch logs, X-Ray tracing)
+- Enhanced monitoring (detailed CloudWatch logs)
 - Disaster recovery enabled (RDS automated backups, S3 cross-region replication)
+- Example tfvars:
+  ```hcl
+  environment = "prod"
+  db_instance_class = "db.t3.medium"
+  desired_count = 3
+  enable_cross_region_replication = true
+  ```
 
 ## Setup Instructions
 
-See [README.md](./README.md#setup) for quick-start: OpenTofu, Terragrunt, and LocalStack installation.
+See [README.md](./README.md#deployment-steps) for quick-start: OpenTofu installation and deployment.
 
 ## Key Files to Review
 
 - **AWS Architecture**: [README.md](./README.md#aws-architecture-diagram)
-- **Deployment Guide**: `docs/DEPLOYMENT.md`
+- **Quick Start**: [README.md](./README.md#quick-start)
 - **Module Specs**: `tofu/modules/[MODULE]/SPEC.md`
-- **Terragrunt Docs**: `terragrunt/README.md`
+- **Module READMEs**: `tofu/modules/[MODULE]/README.md`
+- **Root Configuration**: `main.tf`, `variables.tf`, `outputs.tf`
